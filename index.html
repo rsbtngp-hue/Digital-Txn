@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Head Post Office Operations Tracker</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50">
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module">
+    import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
+    import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+    import {
+      Building2, Clock, AlertTriangle, FileText, Filter, Search, Plus, Trash2, Edit3, X, 
+      ChevronRight, ChevronLeft, CheckCircle2, Clock3, FileSpreadsheet, Save, RotateCcw, 
+      Check, Eye, ArrowUpDown, CheckSquare, Loader2
+    } from 'https://esm.sh/lucide-react@0.344.0';
+
+    function App({ data, updateItem, deleteItem, insertItem }) {
+      const headerEnvelope = useMemo(() => {
+        if (!data || data.length === 0) return null;
+        return (
+          data.find(
+            d =>
+              d.row &&
+              (d.row[0] === 'Timestamp' ||
+                String(d.row[1]).toLowerCase().includes('head post office') ||
+                String(d.row[3]).toLowerCase().includes('counter'))
+          ) || data[0]
+        );
+      }, [data]);
+
+      const headers = useMemo(() => {
+        return headerEnvelope ? headerEnvelope.row : [];
+      }, [headerEnvelope]);
+
+      const rawRows = useMemo(() => {
+        if (!data) return [];
+        return data.filter(
+          d =>
+            d.index_ !== (headerEnvelope ? headerEnvelope.index_ : 0) &&
+            d.row &&
+            d.row.some(c => c !== null && c !== undefined && String(c).trim() !== '')
+        );
+      }, [data, headerEnvelope]);
+
+      const records = useMemo(() => {
+        return rawRows.map(envelope => {
+          const r = envelope.row || [];
+          const timestamp = r[0] ? String(r[0]).trim() : '';
+          const hpo = r[1] ? String(r[1]).trim() : 'Not Specified';
+          const division = r[2] ? String(r[2]).trim() : '';
+          const counterAssigned = r[3] ? String(r[3]).trim() : 'Unassigned';
+
+          const counterDelays = [];
+          const counterSuggestions = [];
+          const processingTimes = [];
+
+          for (let i = 4; i <= 33; i += 3) {
+            const time = r[i];
+            const delay = r[i + 1];
+            const sug = r[i + 2];
+            if (time !== null && time !== undefined && String(time).trim() !== '') {
+              processingTimes.push(String(time).trim());
+            }
+            if (delay !== null && delay !== undefined && String(delay).trim() !== '') {
+              counterDelays.push(String(delay).trim());
+            }
+            if (sug !== null && sug !== undefined && String(sug).trim() !== '') {
+              counterSuggestions.push(String(sug).trim());
+            }
+          }
+
+          return {
+            index_: envelope.index_,
+            raw: r,
+            timestamp, hpo, division, counterAssigned, counterDelays, counterSuggestions,
+            processingTimes
+          };
+        });
+      }, [rawRows]);
+
+      const MASTER_HEAD_OFFICES = useMemo(() => [
+        { sr: 1, ho: 'Akola H.O', division: 'Akola Division' },
+        { sr: 2, ho: 'Amravati H.O', division: 'Amaravati Division' },
+        { sr: 3, ho: 'Paratwada H.O', division: 'Amaravati Division' },
+        { sr: 4, ho: 'Buldana H.O', division: 'Buldana Division' },
+        { sr: 5, ho: 'Khamgaon H.O', division: 'Buldana Division' },
+        { sr: 6, ho: 'Chandrapur H.O', division: 'Chandrapur Division' },
+        { sr: 7, ho: 'Gadchiroli H.O', division: 'Gadchiroli Division' },
+        { sr: 8, ho: 'Nagpur City H.O', division: 'Nagpur City Division' },
+        { sr: 9, ho: 'Nagpur G.P.O.', division: 'Nagpur City Division' },
+        { sr: 10, ho: 'Bhandara H.O', division: 'Nagpur Moffusil Division' },
+        { sr: 11, ho: 'Gondia H.O', division: 'Nagpur Moffusil Division' },
+        { sr: 12, ho: 'Kamthi H.O', division: 'Nagpur Moffusil Division' },
+        { sr: 13, ho: 'Wardha H.O', division: 'Wardha Division' },
+        { sr: 14, ho: 'Yeotmal H.O', division: 'Yeotmal Division' }
+      ], []);
+
+      const DIVISIONS_LIST = useMemo(() => [
+        'All Divisions', 'Akola Division', 'Amaravati Division', 'Buldana Division',
+        'Chandrapur Division', 'Gadchiroli Division', 'Nagpur City Division',
+        'Nagpur Moffusil Division', 'Wardha Division', 'Yeotmal Division'
+      ], []);
+
+      const [selectedDivision, setSelectedDivision] = useState('All Divisions');
+      const [selectedHpoFilter, setSelectedHpoFilter] = useState('ALL');
+      const [selectedDateFilter, setSelectedDateFilter] = useState('');
+      const [counterSortOrder, setCounterSortOrder] = useState('desc');
+
+      // FULLY RESTORED KNOWLEDGE BASE FOR SUGGESTIVE ANSWERS (Q35 to Q58 / Indices 34 to 57)
+      const SUGGESTIVE_ANSWERS = useMemo(() => ({
+        3: ['POSB / Financial Services', 'Mails / Speed Post / BNPL Booking', 'Treasury / Accounts', 'Aadhar Seva Kendra (CELC/UCL)', 'Delivery / Sub-Accounts', 'Other'],
+        time: ['2 minutes', '3 minutes', '5 minutes', '10 minutes', '15 minutes', '30 minutes', '1 day', '2 days', '3 days', '7 days'],
+        delay: ['System lag / Network issue', 'Customer docs incomplete', 'Approvals pending from DO', 'Passbook printer / Hardware issue', 'Customer unfamiliarity with forms', 'Server time-out'],
+        suggestion: ['Smooth functioning of network', 'Customer education & form guidelines', 'Single window approval', 'High-speed printer & scanner', 'SMS alerts for required documents', 'Resolve system glitches'],
+        34: ['Total -162 DD claim cases in SB and 14 cases in PLI/RPLI', 'Near about 200 death claim cases', '10-25 cases', '50+ claim cases', 'Zero pending cases'],
+        35: ['1 DAY in SB and 5 DAYS for end-to-end sanction in PLI', 'Average time 3 days', 'Within 7 days charter', '1-2 days in Finacle/McCamish registration', 'Same-day sanction'],
+        36: ['Passbook / Original Policy Bond / Certificate missing', 'Original Death Certificate / Non-availability of Digital Death Certificate', 'Witness identification / Missing signatures on prescribed forms', 'Proper KYC documents of Legal Heirs / Nominee', 'Succession Certificate / Legal Heir Certificate (in high-value cases)', 'Annexure / Form deficiencies (Affidavit, Letter of Disclaimer, Indemnity Bond)'],
+        37: ['Nomination not registered in old SB cases', 'Legal heir certificate procurement delay', 'Complex affidavit & indemnity bond notarization', 'Unfamiliarity with prescribed claim forms', 'Customer illiteracy regarding required annexures'],
+        38: ['Never', 'Rarely', 'Occasionally exceeds 7 days', 'Frequently exceeds 7-day charter timeline'],
+        39: ['Delay due to mismatch in nominee and depositor name', 'Physical transit of physical dockets between HO and DO', 'Lack of dedicated desk at DO', 'Repeated piecemeal queries raised', 'Staff shortage at Divisional Office'],
+        40: ['Queries regarding mismatch in legal heir name as per AOF and Aadhaar', 'Missing witness identification on claim form', 'Discrepancy in date of death across documents', 'KYC self-attestation missing on dockets', 'Correction in signature of claimant'],
+        41: ['Within a day', '2 to 3 days', 'Procedural delay in corporate agreement verification', 'Smooth onboarding within 48 hours', 'Customer KYC verification delay'],
+        42: ['Smooth API integration', 'Technical support unavailable', 'API manifestation latency', 'EDI auto-manifesting works well', 'Integration issues encountered'],
+        43: ['No issue', 'System not supported', 'Bulk upload timeout', 'Barcode duplicate validation failure', 'Network firewall blocking API calls'],
+        44: ['Smooth automated billing', 'Yes - occasional OTP delivery lag', 'Calculation errors with corporate tariff', 'No delay encountered', 'Manual override required for bulk discount'],
+        45: ['Dedicated pickup schedules adhered to efficiently', 'Mail sits idle awaiting scheduled vehicle', 'Vehicle punctuality needs monitoring', 'Smooth dispatch on schedule'],
+        46: ['Smooth throughput', 'System crashes/hangs with 100+ articles', 'High latency during peak counter hours', 'Fast barcode scanning', 'QR base booking required'],
+        47: ['Yes - resolved within 60 days', 'No - exceeds 60-day window', 'Mostly resolved within 15 days', 'Pending Divisional escalation'],
+        48: ['Lack of door-to-door tracking updates', 'Address incomplete / recipient unavailable', 'Delayed Return to Sender (RTS) processing', 'Delivery manifest mismatch', 'Late scanning at delivery hub'],
+        49: ['Shortage of staff', 'Inadequate training on Finacle/UCL/POS', 'Customer illiteracy/unfamiliarity with forms', 'Heavy seasonal counter rush', 'Passbook updating queues'],
+        50: ['Biometric scanner failures', 'Slow network bandwidth', 'Server time-outs', 'Passbook printer head issues', 'Frequent system hang'],
+        51: ['Redundant physical paperwork', 'Dual entry in register and software', 'Complex approval matrix', 'Excessive physical docket verification', 'Physical token register'],
+        52: ['Shortage of barcoded labels', 'Envelopes shortage', 'New account forms shortage', 'Thermal rolls shortage', 'Stationery supply adequate'],
+        53: ['Conflicting targets', 'Rigid daily cut-off times', 'Inaccurate reporting tools', 'Target vs actual counter time mismatch', 'System clock synchronization issue'],
+        54: ['Drinking water arrangement for customers', 'Inadequate counter ventilation', 'Lack of waiting chairs', 'Unorganized customer flow / lack of token display', 'Air conditioning / fan repair'],
+        55: ['No manual is helpful during failure of system', 'Need robust power backup / UPS', 'Counter lighting and air circulation', 'None / No other specific issues'],
+        56: ['Duplicate physical register entry', 'Manual dispatch book entry', 'Physical SB-3 token register', 'Repeated photocopies of ID proofs', 'Physical claim docket register'],
+        57: ['QR base booking for speed post', 'Assign willing & cooperative official at counter', 'High-speed dedicated leased line network', 'Single window clearance for claims', 'Digital self-service kiosk for claim forms', 'Elimination of duplicate physical register']
+      }), []);
+
+      const getSuggestionsForCol = (colIdx) => {
+        // Remove suggestions for Name of Head Post Office and Division as they are drop-down/readonly
+        if (colIdx === 1 || colIdx === 2) return []; 
+        
+        if (SUGGESTIVE_ANSWERS[colIdx]) return SUGGESTIVE_ANSWERS[colIdx];
+        if (colIdx >= 4 && colIdx <= 33) {
+          const mod = (colIdx - 4) % 3;
+          if (mod === 0) return SUGGESTIVE_ANSWERS.time;
+          if (mod === 1) return SUGGESTIVE_ANSWERS.delay;
+          if (mod === 2) return SUGGESTIVE_ANSWERS.suggestion;
+        }
+        return [];
+      };
+
+      const applySuggestion = (colIdx, sug) => {
+        setQaDraft(prev => {
+          const next = [...prev];
+          while (next.length <= colIdx) next.push(null);
+          const curr = String(next[colIdx] || '').trim();
+          if (!curr || curr === 'null' || curr === 'undefined') {
+            next[colIdx] = sug;
+          } else if (curr.includes(sug)) {
+            const parts = curr.split(',').map(s => s.trim()).filter(s => s && s !== sug);
+            next[colIdx] = parts.join(', ');
+          } else {
+            next[colIdx] = `${curr}, ${sug}`;
+          }
+          return next;
+        });
+      };
+
+      const [activeResponseIndex, setActiveResponseIndex] = useState(null);
+      const [qaDraft, setQaDraft] = useState([]);
+      const [qaFilter, setQaFilter] = useState('all');
+      const [qaSearch, setQaSearch] = useState('');
+      const [isSaveSuccess, setIsSaveSuccess] = useState(false);
+
+      const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+      const [deleteConfirmIndex, setDeleteConfirmIndex] = useState(null);
+
+      const hoSubmissionStats = useMemo(() => {
+        return MASTER_HEAD_OFFICES.map(item => {
+          const matching = records.filter(r => {
+            if (!r.hpo) return false;
+            const cleanR = r.hpo.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanM = item.ho.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const isMatch = cleanR.includes(cleanM) || cleanM.includes(cleanR);
+            if (!isMatch) return false;
+            if (selectedDateFilter && (!r.timestamp || !r.timestamp.startsWith(selectedDateFilter))) return false;
+            return true;
+          });
+          const count = matching.length;
+          let lastRecorded = '-';
+          if (count > 0) {
+            const sorted = [...matching].sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+            lastRecorded = sorted[0].timestamp || '-';
+          }
+          return {
+            sr: item.sr, ho: item.ho, division: item.division,
+            status: count > 0 ? 'Submitted' : 'Pending', countersLogged: count, lastRecorded, matchingRecords: matching
+          };
+        });
+      }, [MASTER_HEAD_OFFICES, records, selectedDateFilter]);
+
+      const kpiMetrics = useMemo(() => {
+        const totalHeadOffices = MASTER_HEAD_OFFICES.length;
+        const surveysSubmitted = hoSubmissionStats.filter(h => h.status === 'Submitted').length;
+        const officesPending = Math.max(0, totalHeadOffices - surveysSubmitted);
+        const totalResponsesLogged = records.length;
+        return { totalHeadOffices, surveysSubmitted, officesPending, totalResponsesLogged };
+      }, [MASTER_HEAD_OFFICES.length, hoSubmissionStats, records.length]);
+
+      const filteredHOList = useMemo(() => {
+        const list = hoSubmissionStats.filter(item => {
+          if (selectedDivision !== 'All Divisions' && item.division !== selectedDivision) return false;
+          if (selectedHpoFilter !== 'ALL' && item.ho !== selectedHpoFilter) return false;
+          return true;
+        });
+        return [...list].sort((a, b) => {
+          if (counterSortOrder === 'asc') return a.countersLogged - b.countersLogged || a.sr - b.sr;
+          return b.countersLogged - a.countersLogged || a.sr - b.sr;
+        });
+      }, [hoSubmissionStats, selectedDivision, selectedHpoFilter, counterSortOrder]);
+
+      const filteredResponses = useMemo(() => {
+        return records.filter(r => {
+          if (selectedDateFilter && (!r.timestamp || !r.timestamp.startsWith(selectedDateFilter))) return false;
+          if (selectedDivision !== 'All Divisions') {
+            const matchedHO = MASTER_HEAD_OFFICES.find(m => {
+              const cleanR = (r.hpo || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+              const cleanM = m.ho.toLowerCase().replace(/[^a-z0-9]/g, '');
+              return cleanR.includes(cleanM) || cleanM.includes(cleanR);
+            });
+            if (!matchedHO || matchedHO.division !== selectedDivision) return false;
+          }
+          if (selectedHpoFilter !== 'ALL' && r.hpo !== selectedHpoFilter) return false;
+          return true;
+        });
+      }, [records, selectedDateFilter, selectedDivision, selectedHpoFilter, MASTER_HEAD_OFFICES]);
+
+      const openQAModal = (indexInFiltered) => {
+        setActiveResponseIndex(indexInFiltered);
+        const resp = filteredResponses[indexInFiltered];
+        if (resp && resp.raw) setQaDraft([...resp.raw]);
+        else setQaDraft([]);
+        setIsSaveSuccess(false);
+      };
+
+      const closeQAModal = () => {
+        setActiveResponseIndex(null);
+        setQaDraft([]);
+        setIsSaveSuccess(false);
+      };
+
+      const handlePrevResponse = () => {
+        if (activeResponseIndex !== null && activeResponseIndex > 0) {
+          const nextIdx = activeResponseIndex - 1;
+          setActiveResponseIndex(nextIdx);
+          const resp = filteredResponses[nextIdx];
+          setQaDraft(resp && resp.raw ? [...resp.raw] : []);
+          setIsSaveSuccess(false);
+        }
+      };
+
+      const handleNextResponse = () => {
+        if (activeResponseIndex !== null && activeResponseIndex < filteredResponses.length - 1) {
+          const nextIdx = activeResponseIndex + 1;
+          setActiveResponseIndex(nextIdx);
+          const resp = filteredResponses[nextIdx];
+          setQaDraft(resp && resp.raw ? [...resp.raw] : []);
+          setIsSaveSuccess(false);
+        }
+      };
+
+      const updateDraftField = (colIdx, val) => {
+        setQaDraft(prev => {
+          const next = [...prev];
+          while (next.length <= colIdx) next.push(null);
+          next[colIdx] = val;
+          return next;
+        });
+      };
+
+      const handleSaveQADraft = async () => {
+        if (activeResponseIndex === null || !filteredResponses[activeResponseIndex]) return;
+        const currentItem = filteredResponses[activeResponseIndex];
+        const maxLen = Math.max(headers.length, qaDraft.length, 58);
+        const updatedRow = new Array(maxLen).fill('');
+
+        for (let i = 0; i < maxLen; i++) {
+          updatedRow[i] = qaDraft[i] !== undefined && qaDraft[i] !== null ? qaDraft[i] : (currentItem.raw[i] !== undefined && currentItem.raw[i] !== null ? currentItem.raw[i] : '');
+        }
+
+        await updateItem(currentItem.index_, updatedRow);
+        setIsSaveSuccess(true);
+        setTimeout(() => setIsSaveSuccess(false), 2500);
+      };
+
+      const handleDeleteRow = async (index_) => {
+        setDeleteConfirmIndex(null);
+        await deleteItem(index_);
+        if (activeResponseIndex !== null) closeQAModal();
+      };
+
+      const initNewDraft = (defaultHo) => {
+        const totalCols = Math.max(headers.length, 58);
+        const arr = new Array(totalCols).fill('');
+        arr[0] = new Date().toISOString().slice(0, 19);
+        arr[1] = defaultHo || 'Akola H.O';
+        const found = MASTER_HEAD_OFFICES.find(m => m.ho === arr[1]);
+        arr[2] = found ? found.division : 'Akola Division';
+        arr[3] = 'POSB / Financial Services';
+        return arr;
+      };
+
+      const [addDraft, setAddDraft] = useState(() => initNewDraft());
+      
+      const updateAddDraftField = (colIdx, val) => {
+        setAddDraft(prev => {
+          const next = [...prev];
+          while (next.length <= colIdx) next.push('');
+          next[colIdx] = val;
+          // Auto link division text box to chosen HPO dropdown
+          if (colIdx === 1) {
+            const matched = MASTER_HEAD_OFFICES.find(m => m.ho === val);
+            if (matched) next[2] = matched.division;
+          }
+          return next;
+        });
+      };
+
+      const applySuggestionToAdd = (colIdx, sug) => {
+        setAddDraft(prev => {
+          const next = [...prev];
+          while (next.length <= colIdx) next.push('');
+          const curr = String(next[colIdx] || '').trim();
+          if (!curr || curr === 'null' || curr === 'undefined') {
+            next[colIdx] = sug;
+          } else if (curr.includes(sug)) {
+            const parts = curr.split(',').map(s => s.trim()).filter(s => s && s !== sug);
+            next[colIdx] = parts.join(', ');
+          } else {
+            next[colIdx] = `${curr}, ${sug}`;
+          }
+          return next;
+        });
+      };
+
+      const handleAddNewRecord = async () => {
+        const maxLen = Math.max(headers.length, addDraft.length, 58);
+        const newRow = new Array(maxLen).fill('');
+        for (let i = 0; i < maxLen; i++) {
+          const val = addDraft[i];
+          newRow[i] = val !== undefined && val !== null && String(val).trim() !== '' ? val : '';
+        }
+        if (!newRow[0]) newRow[0] = new Date().toISOString().slice(0, 19);
+        
+        await insertItem(undefined, newRow);
+        
+        setIsAddModalOpen(false);
+        setAddDraft(initNewDraft());
+      };
+
+      const getQuestionCategory = (idx) => {
+        if (idx <= 3) return 'General Information';
+        if (idx <= 33) return 'Counter Processing & Delays';
+        if (idx <= 40) return 'Deceased Claims Diagnostics';
+        if (idx <= 48) return 'BNPL & Logistics Operations';
+        if (idx <= 55) return 'Ishikawa 6M Lean Factors';
+        return 'Kaizen & Continuous Improvement';
+      };
+
+      const getQuestionLabel = (idx) => {
+        if (headers && headers[idx] && String(headers[idx]).trim()) return String(headers[idx]).trim();
+        if (idx === 0) return 'Timestamp';
+        if (idx === 1) return 'Head Post Office';
+        if (idx === 2) return 'Division / Region';
+        if (idx === 3) return 'Counter Assigned';
+        if (idx >= 4 && idx <= 33) {
+            const n = Math.floor((idx-4)/3) + 1;
+            const m = (idx-4)%3;
+            if (m === 0) return `C${n} - Time Taken`;
+            if (m === 1) return `C${n} - Delay Reason`;
+            return `C${n} - Suggestion`;
+        }
+        return `Question #${idx + 1}`;
+      };
+
+      const activeResponse = activeResponseIndex !== null ? filteredResponses[activeResponseIndex] : null;
+
+      const modalQuestions = useMemo(() => {
+        if (!activeResponse) return [];
+        const totalCols = Math.max(headers.length, qaDraft.length, (activeResponse.raw || []).length, 58);
+        const list = [];
+        for (let i = 0; i < totalCols; i++) {
+          const qText = getQuestionLabel(i);
+          const answerVal = qaDraft[i] !== undefined ? qaDraft[i] : (activeResponse.raw[i] ?? '');
+          const strAnswer = String(answerVal ?? '').trim();
+          const hasAnswer = strAnswer !== '' && strAnswer !== 'null' && strAnswer !== 'undefined';
+
+          if (qaFilter === 'answered' && !hasAnswer) continue;
+          if (qaSearch.trim()) {
+            const q = qaSearch.toLowerCase();
+            const matchesQ = qText.toLowerCase().includes(q);
+            const matchesA = strAnswer.toLowerCase().includes(q);
+            if (!matchesQ && !matchesA) continue;
+          }
+          list.push({ colIdx: i, question: qText, category: getQuestionCategory(i), answer: answerVal ?? '', hasAnswer });
+        }
+        return list;
+      }, [activeResponse, headers, qaDraft, qaFilter, qaSearch]);
+
+      return (
+        <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col antialiased relative">
+          
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-16 gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-amber-600 flex items-center justify-center text-white shadow-sm flex-shrink-0">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-base sm:text-lg font-bold text-slate-900 truncate">
+                        Operational Efficiency, Service Standards & Process Improvement (Head Post Offices) - Nagpur Region
+                      </h1>
+                    </div>
+                    <p className="text-xs text-slate-500 hidden sm:block truncate">
+                      Head Post Office Operations & Survey Responses
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => {
+                      setAddDraft(initNewDraft());
+                      setIsAddModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-medium transition shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Response</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+            <section aria-label="Key Performance Indicators">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-slate-300 transition">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-600">Total Offices</span>
+                    <Building2 className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-3xl font-bold text-slate-900">{kpiMetrics.totalHeadOffices}</span>
+                  </div>
+                </div>
+
+                <div onClick={() => { if (filteredResponses.length > 0) openQAModal(0); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-emerald-400 hover:shadow-md transition cursor-pointer group">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Submitted</span>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="mt-2">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-bold text-emerald-600">{kpiMetrics.surveysSubmitted}</span>
+                      <span className="text-[11px] font-semibold text-emerald-700 group-hover:underline flex items-center gap-1"><Eye className="w-3 h-3" /> View Q&A</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-slate-300 transition">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">Pending</span>
+                    <Clock3 className="w-4 h-4 text-amber-500" />
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-3xl font-bold text-amber-600">{kpiMetrics.officesPending}</span>
+                  </div>
+                </div>
+
+                <div onClick={() => { if (filteredResponses.length > 0) openQAModal(0); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-red-400 hover:shadow-md transition cursor-pointer group">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-red-700">Total Responses</span>
+                    <FileSpreadsheet className="w-4 h-4 text-red-600" />
+                  </div>
+                  <div className="mt-2">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-bold text-red-600">{kpiMetrics.totalResponsesLogged}</span>
+                      <span className="text-[11px] font-semibold text-red-700 group-hover:underline flex items-center gap-1"><Eye className="w-3 h-3" /> View Q&A</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-4 sm:p-5 border-b border-slate-200 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-red-600" /> Submission Position
+                    </h2>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-slate-100">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1"><Filter className="w-3 h-3 text-red-600" /> Postal Division</label>
+                    <select value={selectedDivision} onChange={e => setSelectedDivision(e.target.value)} className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-red-500">
+                      {DIVISIONS_LIST.map(div => (<option key={div} value={div}>{div}</option>))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1"><Building2 className="w-3 h-3 text-red-600" /> Head Post Office</label>
+                    <select value={selectedHpoFilter} onChange={e => setSelectedHpoFilter(e.target.value)} className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-red-500">
+                      <option value="ALL">All Head Post Offices</option>
+                      {MASTER_HEAD_OFFICES.map(h => (<option key={h.ho} value={h.ho}>{h.ho}</option>))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 text-slate-700 uppercase font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 w-12 text-center">Sr</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Head Post Office (HO)</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Postal Division</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Status</th>
+                      <th className="px-4 py-3 text-center whitespace-nowrap cursor-pointer hover:bg-slate-100" onClick={() => setCounterSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}>
+                        <span className="inline-flex items-center justify-center gap-1.5 text-slate-800 font-bold">Counters Logged <ArrowUpDown className="w-3.5 h-3.5 text-red-600" /></span>
+                      </th>
+                      <th className="px-4 py-3 text-right whitespace-nowrap">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {filteredHOList.map(item => {
+                      const handleOfficeClick = () => {
+                        const matchIdx = filteredResponses.findIndex(r => r.hpo === item.ho);
+                        if (matchIdx !== -1) { openQAModal(matchIdx); } 
+                        else {
+                          const allIdx = records.findIndex(r => r.hpo === item.ho);
+                          if (allIdx !== -1) {
+                            setSelectedHpoFilter(item.ho); setSelectedDivision('All Divisions');
+                            openQAModal(records.findIndex(r => r.hpo === item.ho));
+                          } else {
+                            setAddDraft(initNewDraft(item.ho));
+                            setIsAddModalOpen(true);
+                          }
+                        }
+                      };
+
+                      return (
+                        <tr key={item.sr} className="hover:bg-red-50/50 transition cursor-pointer group" onClick={handleOfficeClick}>
+                          <td className="px-4 py-3 font-mono text-center text-slate-500 font-semibold group-hover:text-red-700">{item.sr}</td>
+                          <td className="px-4 py-3 font-bold text-slate-900 whitespace-nowrap group-hover:text-red-700">
+                            <span className="flex items-center gap-1.5">
+                              <Building2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-red-600" />
+                              <span className="underline decoration-dotted underline-offset-2">{item.ho}</span>
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{item.division}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {item.status === 'Submitted' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"><CheckCircle2 className="w-3 h-3" /> Submitted</span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"><Clock3 className="w-3 h-3" /> Pending</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center font-bold text-slate-800 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs ${item.countersLogged > 0 ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-slate-100 text-slate-500'}`}>
+                              {item.countersLogged}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            {item.countersLogged > 0 ? (
+                              <button type="button" onClick={(e) => { e.stopPropagation(); handleOfficeClick(); }} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium cursor-pointer"><Eye className="w-3 h-3" /> View Q&A</button>
+                            ) : (
+                              <button type="button" onClick={(e) => { e.stopPropagation(); setAddDraft(initNewDraft(item.ho)); setIsAddModalOpen(true); }} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-300 hover:bg-slate-100 text-slate-600 text-xs font-medium cursor-pointer"><Plus className="w-3 h-3" /> Log Survey</button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </main>
+
+          {/* TWO-SIDED QUESTION & ANSWER POP-UP MODAL (EDIT VIEW) */}
+          {activeResponse && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+              <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-300">
+                <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 flex-shrink-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center text-white flex-shrink-0"><Building2 className="w-4 h-4" /></div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm sm:text-base font-bold text-white truncate">{activeResponse.hpo} — Survey Q&A</h3>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700 mr-2">
+                        <button onClick={handlePrevResponse} disabled={activeResponseIndex <= 0} className="p-1.5 text-slate-300 hover:text-white rounded-md hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition" title="Previous Survey">
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <span className="text-[11px] font-semibold text-slate-300 px-2 min-w-[50px] text-center">
+                          {activeResponseIndex + 1} / {filteredResponses.length}
+                        </span>
+                        <button onClick={handleNextResponse} disabled={activeResponseIndex >= filteredResponses.length - 1} className="p-1.5 text-slate-300 hover:text-white rounded-md hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition" title="Next Survey">
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    <div className="w-px h-5 bg-slate-700 hidden sm:block"></div>
+
+                    <button onClick={() => setDeleteConfirmIndex(activeResponse.index_)} className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition cursor-pointer"><Trash2 className="w-5 h-5" /></button>
+                    <button onClick={closeQAModal} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"><X className="w-5 h-5" /></button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-100 text-slate-700 text-xs font-bold border-b border-slate-200 sticky top-0 z-10">
+                      <tr>
+                        <th className="px-4 py-3 w-16 text-center">#</th>
+                        <th className="px-4 py-3 w-5/12">Survey Question</th>
+                        <th className="px-4 py-3 w-7/12">Recorded Answer (Editable)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-xs">
+                      {modalQuestions.map((item) => (
+                        <tr key={item.colIdx} className="hover:bg-slate-50/70 transition">
+                          <td className="px-4 py-3.5 align-top text-center font-mono font-bold text-slate-700 bg-slate-50 border-r border-slate-100">Q{item.colIdx + 1}</td>
+                          <td className="px-4 py-3.5 align-top">
+                            <span className="inline-block text-[10px] font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200 mb-1">{item.category}</span>
+                            <p className="font-semibold text-slate-900 text-xs">{item.question}</p>
+                          </td>
+                          <td className="px-4 py-3.5 align-top">
+                            
+                            {item.colIdx === 1 ? (
+                              <select
+                                value={item.answer ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setQaDraft(prev => {
+                                    const next = [...prev];
+                                    while(next.length <= 2) next.push(null);
+                                    next[1] = val;
+                                    const match = MASTER_HEAD_OFFICES.find(m => m.ho === val);
+                                    if (match) next[2] = match.division;
+                                    return next;
+                                  });
+                                }}
+                                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                              >
+                                <option value="" disabled>Select Head Post Office</option>
+                                {MASTER_HEAD_OFFICES.map(h => <option key={h.ho} value={h.ho}>{h.ho}</option>)}
+                              </select>
+                            ) : item.colIdx === 2 ? (
+                              <input
+                                type="text"
+                                readOnly
+                                value={item.answer ?? ''}
+                                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-600 bg-slate-100 cursor-not-allowed focus:outline-none"
+                              />
+                            ) : (
+                              <textarea rows="2" value={item.answer ?? ''} onChange={(e) => updateDraftField(item.colIdx, e.target.value)} className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-500" />
+                            )}
+
+                            {getSuggestionsForCol(item.colIdx).length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                    {getSuggestionsForCol(item.colIdx).map((sug, i) => (
+                                        <button key={i} onClick={() => applySuggestion(item.colIdx, sug)} className="text-[10px] bg-slate-100 hover:bg-red-50 px-2 py-0.5 rounded border border-slate-200 hover:border-red-200 cursor-pointer text-slate-600 transition">+{sug}</button>
+                                    ))}
+                                </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                      <button onClick={handlePrevResponse} disabled={activeResponseIndex <= 0} className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-medium text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition">
+                        <ChevronLeft className="w-4 h-4" /> Previous
+                      </button>
+                      <button onClick={handleNextResponse} disabled={activeResponseIndex >= filteredResponses.length - 1} className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-medium text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition">
+                        Next <ChevronRight className="w-4 h-4" />
+                      </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                      <button onClick={closeQAModal} className="px-4 py-1.5 border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-medium text-slate-700 cursor-pointer">Close</button>
+                      <button onClick={handleSaveQADraft} className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold cursor-pointer">Save Changes</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FULL "LOG NEW RESPONSE" ADD MODAL */}
+          {isAddModalOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+              <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-300 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 flex-shrink-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white flex-shrink-0">
+                      <Plus className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm sm:text-base font-bold text-white truncate">
+                        Log New Head Post Office Survey Response
+                      </h3>
+                      <p className="text-xs text-slate-400 truncate">
+                        Complete operational parameters & lean questions with suggestive answers
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-100 text-slate-700 text-xs font-bold border-b border-slate-200 sticky top-0 z-10">
+                      <tr>
+                        <th className="px-4 py-3 w-16 text-center whitespace-nowrap">#</th>
+                        <th className="px-4 py-3 w-5/12 whitespace-nowrap">Survey Question & Parameter</th>
+                        <th className="px-4 py-3 w-7/12 whitespace-nowrap">Response Answer</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-xs">
+                      {Array.from({ length: Math.max(headers.length, addDraft.length, 58) }).map((_, i) => {
+                        const qText = getQuestionLabel(i);
+                        const ansVal = addDraft[i] ?? '';
+                        const strAns = String(ansVal).trim();
+                        const category = getQuestionCategory(i);
+                        const suggestions = getSuggestionsForCol(i);
+                        const isLong = strAns.length > 65 || i >= 34;
+
+                        return (
+                          <tr key={i} className="hover:bg-slate-50/70 transition">
+                            <td className="px-4 py-3.5 align-top text-center">
+                              <span className="inline-flex items-center justify-center w-8 h-6 rounded bg-slate-100 font-mono text-[11px] font-bold text-slate-700 border border-slate-200">
+                                Q{i + 1}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5 align-top space-y-1">
+                              <div>
+                                <span className="inline-block text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                  {category}
+                                </span>
+                              </div>
+                              <p className="font-semibold text-slate-900 text-xs leading-relaxed">
+                                {qText}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3.5 align-top space-y-2">
+                              
+                              {i === 1 ? (
+                                <select
+                                  value={ansVal}
+                                  onChange={e => updateAddDraftField(i, e.target.value)}
+                                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                >
+                                  <option value="" disabled>Select Head Post Office...</option>
+                                  {MASTER_HEAD_OFFICES.map(h => (
+                                    <option key={h.ho} value={h.ho}>{h.ho} ({h.division})</option>
+                                  ))}
+                                </select>
+                              ) : i === 2 ? (
+                                <input
+                                  type="text"
+                                  readOnly
+                                  value={ansVal}
+                                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-600 bg-slate-100 cursor-not-allowed focus:outline-none"
+                                />
+                              ) : isLong ? (
+                                <textarea
+                                  rows={Math.min(4, Math.max(2, Math.ceil(strAns.length / 50)))}
+                                  value={ansVal}
+                                  onChange={e => updateAddDraftField(i, e.target.value)}
+                                  placeholder="Type or click suggestive answers below..."
+                                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y leading-relaxed"
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={ansVal}
+                                  onChange={e => updateAddDraftField(i, e.target.value)}
+                                  placeholder="Type or click suggestive answers below..."
+                                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                              )}
+
+                              {suggestions.length > 0 && (
+                                <div className="pt-1">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    {suggestions.map((sug, sIdx) => {
+                                      const isContained = strAns.toLowerCase().includes(sug.toLowerCase());
+                                      return (
+                                        <button
+                                          key={sIdx}
+                                          type="button"
+                                          onClick={() => applySuggestionToAdd(i, sug)}
+                                          className={`text-[10px] px-2 py-0.5 rounded-md border transition cursor-pointer flex items-center gap-1 ${
+                                            isContained
+                                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold'
+                                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200'
+                                          }`}
+                                        >
+                                          <span>{isContained ? '✓' : '+'} {sug}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="px-4 py-1.5 border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-medium text-slate-700 transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddNewRecord}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" /> Submit Survey Response
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DELETE CONFIRMATION MODAL */}
+          {deleteConfirmIndex !== null && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-xl max-w-sm w-full p-5 shadow-xl border border-slate-200">
+                <div className="flex items-center gap-3 text-red-600 mb-3"><AlertTriangle className="w-6 h-6" /><h3 className="text-sm font-bold text-slate-900">Confirm Deletion</h3></div>
+                <p className="text-xs text-slate-600 mb-4">Are you sure you want to permanently delete this row? This change will persist immediately to the Google Sheet.</p>
+                <div className="flex items-center justify-end gap-2">
+                  <button onClick={() => setDeleteConfirmIndex(null)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 cursor-pointer">Cancel</button>
+                  <button onClick={() => handleDeleteRow(deleteConfirmIndex)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold cursor-pointer">Delete Row</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ============================================================================
+    // GOOGLE SHEETS LIVE DATA WRAPPER
+    // ============================================================================
+    function DashboardWrapper() {
+      // ⚠️ YOUR PROVIDED GOOGLE APPS SCRIPT WEB APP URL IS HERE ⚠️
+      const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby2CQg6B7-OlJuGFC8B_pIUdfjlB9TBFYebe4lOYrYuCORSTpddEX2UwbsytzEJVjEnvg/exec';
+
+      const [data, setData] = useState([]);
+      const [isLoading, setIsLoading] = useState(true);
+      const [isSyncing, setIsSyncing] = useState(false);
+
+      // Fetch Data (GET)
+      const fetchSheetData = async () => {
+        setIsLoading(true);
+        try {
+          const res = await fetch(APP_SCRIPT_URL);
+          const json = await res.json();
+          setData(json);
+        } catch (e) {
+          console.error("Error fetching data from Google Sheets:", e);
+          alert("Failed to connect to Google Sheets. Check your App Script URL and ensure your Sheet is named correctly ('Data').");
+        }
+        setIsLoading(false);
+      };
+
+      useEffect(() => {
+        fetchSheetData();
+      }, []);
+
+      // Update Data (POST)
+      const updateItem = async (index_, newRow) => {
+        setIsSyncing(true);
+        setData(prev => prev.map(d => d.index_ === index_ ? { ...d, row: newRow } : d));
+        try {
+          await fetch(APP_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'update', index_, row: newRow }) 
+          });
+        } catch (e) {
+          console.error("Update failed", e);
+          alert("Failed to save changes to Google Sheet.");
+          fetchSheetData(); 
+        }
+        setIsSyncing(false);
+      };
+
+      // Delete Data (POST)
+      const deleteItem = async (index_) => {
+        setIsSyncing(true);
+        setData(prev => prev.filter(d => d.index_ !== index_)); 
+        try {
+          await fetch(APP_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'delete', index_ })
+          });
+          await fetchSheetData(); 
+        } catch (e) {
+          console.error("Delete failed", e);
+          alert("Failed to delete from Google Sheet.");
+          fetchSheetData();
+        }
+        setIsSyncing(false);
+      };
+
+      // Insert Data (POST)
+      const insertItem = async (_, newRow) => {
+        setIsSyncing(true);
+        try {
+          await fetch(APP_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'insert', row: newRow })
+          });
+          await fetchSheetData(); 
+        } catch (e) {
+          console.error("Insert failed", e);
+          alert("Failed to add new record to Google Sheet.");
+        }
+        setIsSyncing(false);
+      };
+
+      if (isLoading) {
+        return (
+          <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center space-y-4">
+            <Loader2 className="w-10 h-10 text-red-600 animate-spin" />
+            <p className="text-sm font-semibold text-slate-600">Connecting to Google Sheets...</p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="relative">
+          {isSyncing && (
+            <div className="fixed top-4 right-4 z-50 bg-slate-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-xs font-semibold animate-in fade-in zoom-in-95 duration-200">
+               <Loader2 className="w-4 h-4 animate-spin text-red-400" /> Syncing to Google Sheet...
+            </div>
+          )}
+          
+          <App 
+            data={data} 
+            updateItem={updateItem} 
+            deleteItem={deleteItem} 
+            insertItem={insertItem} 
+          />
+        </div>
+      );
+    }
+
+    const root = createRoot(document.getElementById('root'));
+    root.render(<DashboardWrapper />);
+  </script>
+</body>
+</html>
