@@ -1,995 +1,2431 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Head Post Office Operations Tracker</title>
-  
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Transaction Report - Nagpur Region</title>
+    <!-- SheetJS for Export to Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- html2canvas for rasterizing cards -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- jsPDF for rendering the 3-page PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #991b1b;
+            --primary-dark: #7f1d1d;
+            --primary-light: #fecaca;
+            --primary-glow: rgba(153, 27, 27, 0.18);
+            --accent: #d97706;
+            --success: #059669;
+            --success-light: #d1fae5;
+            --warning: #d97706;
+            --warning-light: #fef3c7;
+            --danger: #dc2626;
+            --danger-light: #fee2e2;
+            --info: #0284c7;
+            --bg-body: #f8fafc;
+            --bg-surface: #ffffff;
+            --bg-surface-2: #f1f5f9;
+            --bg-surface-hover: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-tertiary: #64748b;
+            --border: #cbd5e1;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --header-bg: linear-gradient(135deg, #450a0a 0%, #7f1d1d 50%, #991b1b 100%);
+            --radius-sm: 6px;
+            --radius: 10px;
+            --radius-lg: 14px;
+            --radius-full: 9999px;
+            --trans: 0.2s ease;
+        }
+
+        [data-theme="dark"] {
+            --primary: #f87171;
+            --primary-dark: #b91c1c;
+            --primary-light: #450a0a;
+            --primary-glow: rgba(248, 113, 113, 0.2);
+            --bg-body: #090d16;
+            --bg-surface: #131d2e;
+            --bg-surface-2: #1e293b;
+            --bg-surface-hover: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-tertiary: #64748b;
+            --border: #2d3f59;
+            --header-bg: linear-gradient(135deg, #180202 0%, #3b0707 50%, #131d2e 100%);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-body);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.5;
+        }
+
+        .govt-header {
+            background: var(--header-bg);
+            padding: 14px 28px;
+            color: #fff;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+        }
+
+        .govt-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #f87171, #fbbf24, #34d399, #38bdf8);
+        }
+
+        .header-content {
+            max-width: 1440px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .logo-section { display: flex; align-items: center; gap: 14px; }
+        .emblem-badge {
+            width: 44px;
+            height: 44px;
+            background: #fff;
+            color: #991b1b;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            border: 2px solid var(--accent);
+        }
+
+        .dept-name { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; opacity: 0.9; text-transform: uppercase; }
+        .portal-title { font-size: 19px; font-weight: 800; letter-spacing: -0.3px; }
+
+        .container {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 20px 24px;
+            width: 100%;
+            flex: 1;
+        }
+
+        .controls-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 18px 24px;
+            margin-bottom: 22px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .upload-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+            border-bottom: 1px dashed var(--border);
+            padding-bottom: 14px;
+        }
+
+        .drop-zone {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: var(--radius);
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all var(--trans);
+            border: 1.5px dashed var(--primary);
+            background: var(--bg-surface-2);
+            color: var(--text-primary);
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            background: var(--primary-glow);
+            border-color: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 14px;
+            align-items: end;
+        }
+
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label {
+            font-size: 11.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.04em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .form-group label i { color: var(--primary); }
+
+        .form-control {
+            padding: 9px 12px;
+            border-radius: var(--radius);
+            border: 1.5px solid var(--border);
+            background: var(--bg-surface-2);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color var(--trans), box-shadow var(--trans);
+        }
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        /* 4 KPI Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin-bottom: 22px;
+        }
+
+        .stat-card {
+            background: var(--bg-surface);
+            padding: 20px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            transition: transform var(--trans);
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+        }
+        .stat-card:nth-child(1)::before { background: var(--primary); }
+        .stat-card:nth-child(2)::before { background: var(--danger); }
+        .stat-card:nth-child(3)::before { background: var(--success); }
+        .stat-card:nth-child(4)::before { background: var(--warning); }
+
+        .stat-icon {
+            width: 44px; height: 44px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+        .stat-card:nth-child(1) .stat-icon { background: linear-gradient(135deg, #991b1b, #7f1d1d); }
+        .stat-card:nth-child(2) .stat-icon { background: linear-gradient(135deg, #dc2626, #991b1b); }
+        .stat-card:nth-child(3) .stat-icon { background: linear-gradient(135deg, #059669, #047857); }
+        .stat-card:nth-child(4) .stat-icon { background: linear-gradient(135deg, #d97706, #b45309); }
+
+        .stat-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.05em;
+        }
+        .stat-value {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-top: 4px;
+        }
+
+        /* Banner Report Section */
+        .report-banner-card {
+            background: var(--bg-surface);
+            border-radius: var(--radius-lg);
+            border: 1.5px solid var(--border);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 22px;
+        }
+
+        .banner-header {
+            background: #b9e6f3;
+            color: #0c4a6e;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            border-bottom: 2px solid #38bdf8;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        [data-theme="dark"] .banner-header {
+            background: #082f49;
+            color: #f0f9ff;
+            border-bottom-color: #0369a1;
+        }
+
+        .banner-title {
+            font-size: 22px;
+            font-weight: 900;
+            font-style: italic;
+            letter-spacing: -0.5px;
+        }
+
+        .banner-subtitle {
+            font-size: 13.5px;
+            font-weight: 700;
+            font-style: italic;
+            margin-top: 3px;
+            opacity: 0.95;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            background: var(--bg-surface);
+        }
+
+        .division-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13.5px;
+        }
+
+        .division-summary-table th {
+            background: #fed7aa;
+            color: #7c2d12;
+            padding: 12px 16px;
+            font-weight: 800;
+            border: 1px solid #fdba74;
+            text-align: center;
+            font-size: 13.5px;
+            font-style: italic;
+        }
+        [data-theme="dark"] .division-summary-table th {
+            background: #7c2d12;
+            color: #ffedd5;
+            border-color: #9a3412;
+        }
+
+        .division-summary-table td {
+            padding: 10px 16px;
+            border: 1px solid var(--border);
+            text-align: center;
+            font-weight: 500;
+        }
+        .division-summary-table tbody tr:nth-child(even) {
+            background: var(--bg-surface-2);
+        }
+
+        .division-summary-table .total-row {
+            background: #ffedd5 !important;
+            color: #7c2d12;
+            font-weight: 900;
+            font-size: 14.5px;
+            border-top: 2.5px solid #ea580c;
+        }
+        [data-theme="dark"] .division-summary-table .total-row {
+            background: #431407 !important;
+            color: #ffedd5;
+        }
+
+        .trend-icon {
+            font-size: 15px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .trend-up { color: #16a34a; }
+        .trend-mid { color: #d97706; }
+        .trend-down { color: #dc2626; }
+
+        .card {
+            background: var(--bg-surface);
+            padding: 22px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            margin-bottom: 22px;
+        }
+
+        /* Office Type Matrix Table */
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .matrix-table th {
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            text-align: center;
+            font-weight: 700;
+            background: var(--bg-surface-2);
+        }
+        .matrix-table td {
+            padding: 9px 14px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .matrix-table tr:hover {
+            background: var(--bg-surface-hover);
+        }
+        .matrix-table .total-tr {
+            font-weight: 800;
+            background: var(--bg-surface-2) !important;
+        }
+
+        .shortfall-link {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: var(--radius-full);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all var(--trans);
+            background: var(--danger-light);
+            color: var(--danger);
+            text-decoration: none;
+        }
+        .shortfall-link:hover {
+            background: var(--danger);
+            color: #fff;
+            transform: scale(1.05);
+        }
+        .shortfall-zero {
+            color: var(--text-tertiary);
+            font-weight: 600;
+        }
+
+        /* 3-Column Rankings */
+        .three-column-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 10px;
+            margin-bottom: 22px;
+        }
+
+        .chart-card {
+            background: var(--bg-surface);
+            padding: 20px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .chart-header {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .performance-list {
+            list-style: none;
+            max-height: 320px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+        .performance-item {
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            background: var(--bg-surface-2);
+            border-radius: var(--radius-sm);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            border-left: 3.5px solid transparent;
+            cursor: pointer;
+            transition: all var(--trans);
+        }
+        .performance-item:hover {
+            background: var(--bg-surface-hover);
+            transform: translateX(2px);
+        }
+        .performance-rank {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 10.5px;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+        .performance-info {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            overflow: hidden;
+        }
+        .performance-name-row { 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+        }
+        .performance-office-name {
+            font-weight: 600; 
+            color: var(--text-primary); 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            white-space: nowrap;
+        }
+        .performance-sub-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .division-tag {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .division-tag i {
+            font-size: 9px;
+            margin-right: 3px;
+            color: var(--primary);
+        }
+
+        .performance-badge { padding: 3px 8px; border-radius: var(--radius-full); font-weight: 700; font-size: 11px; flex-shrink: 0; }
+
+        .type-tag {
+            font-size: 9px;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 4px;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+        .type-HPO { background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
+        .type-SPO { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; }
+        .type-BPO { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+        .type-GPO { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+        .type-RMS { background: #fae8ff; color: #a21caf; border: 1px solid #f5d0fe; }
+
+        /* Buttons & Actions */
+        .btn-ui {
+            background: transparent;
+            color: #fff;
+            border: 1.5px solid rgba(255,255,255,0.4);
+            font-size: 12px;
+            padding: 6px 14px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all var(--trans);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-ui:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: #fff;
+        }
+
+        .btn-excel {
+            background: #059669;
+            color: #ffffff;
+            border: none;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: var(--shadow-sm);
+            transition: all var(--trans);
+        }
+        .btn-excel:hover {
+            background: #047857;
+            transform: translateY(-1px);
+        }
+
+        .btn-pdf {
+            background: #ea580c;
+            color: #ffffff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: var(--radius);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: var(--shadow-sm);
+            transition: all var(--trans);
+        }
+        .btn-pdf:hover {
+            background: #c2410c;
+            transform: translateY(-1px);
+        }
+
+        .btn-action {
+            background: #0284c7;
+            color: #ffffff;
+            border: none;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: var(--shadow-sm);
+            transition: all var(--trans);
+        }
+        .btn-action:hover {
+            background: #0369a1;
+            transform: translateY(-1px);
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(3px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 18px;
+        }
+        .modal-card {
+            background: var(--bg-surface);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 900px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            border: 1.5px solid var(--border);
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
+            overflow: hidden;
+            animation: modalFadeIn 0.2s ease-out;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-header {
+            padding: 16px 20px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .modal-body {
+            padding: 18px 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .modal-footer {
+            padding: 12px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            background: var(--bg-surface-2);
+        }
+
+        .footer {
+            background: linear-gradient(135deg, #180202, #3b0707);
+            color: rgba(255,255,255,0.75);
+            padding: 14px 28px;
+            font-size: 12px;
+            margin-top: auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        /* ------------------ 3-PAGE FIXED SHEET PRINT ENGINE ------------------ */
+        .pdf-page-sheet {
+            display: block;
+            width: 100%;
+        }
+
+        .pdf-page-header {
+            display: none;
+        }
+
+        body.pdf-export-mode {
+            background: #f8fafc !important;
+            color: #0f172a !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 1122px !important;
+            min-width: 1122px !important;
+            max-width: 1122px !important;
+        }
+
+        body.pdf-export-mode .container {
+            padding: 0 !important;
+            max-width: 1122px !important;
+            width: 1122px !important;
+        }
+
+        /* Fixed Standard A4 Landscape Page Bounds */
+        body.pdf-export-mode .pdf-page-sheet {
+            width: 1122px !important;
+            height: 792px !important;
+            max-height: 792px !important;
+            padding: 14px 20px !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+            background: #f8fafc !important;
+            page-break-after: always !important;
+            break-after: page !important;
+        }
+
+        body.pdf-export-mode .pdf-page-header {
+            display: block !important;
+            margin: -14px -20px 14px -20px !important;
+            padding: 10px 20px !important;
+        }
+
+        body.pdf-export-mode #main-navbar {
+            margin: -14px -20px 12px -20px !important;
+            padding: 10px 20px !important;
+        }
+
+        body.pdf-export-mode .govt-header .portal-title {
+            font-size: 16px !important;
+        }
+        body.pdf-export-mode .govt-header .emblem-badge {
+            width: 36px !important;
+            height: 36px !important;
+            font-size: 18px !important;
+        }
+
+        body.pdf-export-mode .upload-row,
+        body.pdf-export-mode .modal-overlay,
+        body.pdf-export-mode .footer,
+        body.pdf-export-mode [data-pdf-ignore="true"] {
+            display: none !important;
+        }
+
+        /* Page 1 Compact Rules */
+        body.pdf-export-mode #pdf-page-1 .controls-card {
+            padding: 10px 14px !important;
+            margin-bottom: 12px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .filter-grid {
+            gap: 10px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .form-group label {
+            font-size: 10px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .form-control {
+            padding: 5px 8px !important;
+            font-size: 11.5px !important;
+            height: 30px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .stats-grid {
+            margin-bottom: 12px !important;
+            gap: 12px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .stat-card {
+            padding: 10px 14px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .stat-icon {
+            width: 32px !important;
+            height: 32px !important;
+            font-size: 14px !important;
+            margin-bottom: 6px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .stat-label {
+            font-size: 10px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .stat-value {
+            font-size: 20px !important;
+            margin-top: 2px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .report-banner-card {
+            margin-bottom: 0 !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .banner-header {
+            padding: 8px 14px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .banner-title {
+            font-size: 17px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .banner-subtitle {
+            font-size: 11.5px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .division-summary-table th,
+        body.pdf-export-mode #pdf-page-1 .division-summary-table td {
+            padding: 5.5px 10px !important;
+            font-size: 11.5px !important;
+        }
+        body.pdf-export-mode #pdf-page-1 .division-summary-table .total-row {
+            font-size: 12.5px !important;
+        }
+
+        /* Page 2 Compact Rules */
+        body.pdf-export-mode #pdf-page-2 .card {
+            padding: 12px 16px !important;
+            margin-bottom: 12px !important;
+        }
+        body.pdf-export-mode #pdf-page-2 .chart-header {
+            margin-bottom: 8px !important;
+            padding-bottom: 4px !important;
+            font-size: 13px !important;
+        }
+        body.pdf-export-mode #pdf-page-2 #subdivision-table-el th,
+        body.pdf-export-mode #pdf-page-2 #subdivision-table-el td {
+            padding: 5px 8px !important;
+            font-size: 11px !important;
+        }
+        body.pdf-export-mode #pdf-page-2 .matrix-table th,
+        body.pdf-export-mode #pdf-page-2 .matrix-table td {
+            padding: 4.5px 6px !important;
+            font-size: 10.5px !important;
+        }
+
+        /* Page 3 Roomy Rules */
+        body.pdf-export-mode #pdf-page-3 .three-column-grid {
+            gap: 16px !important;
+            margin-top: 8px !important;
+            margin-bottom: 0 !important;
+        }
+        body.pdf-export-mode #pdf-page-3 .chart-card {
+            padding: 16px 18px !important;
+        }
+        body.pdf-export-mode #pdf-page-3 .chart-header {
+            font-size: 14.5px !important;
+            margin-bottom: 12px !important;
+            padding-bottom: 6px !important;
+        }
+        body.pdf-export-mode #pdf-page-3 .performance-list {
+            max-height: none !important;
+            overflow: visible !important;
+            margin-top: 8px !important;
+        }
+        body.pdf-export-mode #pdf-page-3 .performance-item {
+            padding: 9px 12px !important;
+            margin-bottom: 8px !important;
+            font-size: 11.5px !important;
+        }
+        body.pdf-export-mode #pdf-page-3 .performance-rank {
+            width: 22px !important;
+            height: 22px !important;
+            font-size: 11px !important;
+            margin-right: 8px !important;
+        }
+
+        @media print {
+            .upload-row, .modal-overlay, .footer, [data-pdf-ignore="true"] {
+                display: none !important;
+            }
+            .pdf-page-sheet {
+                page-break-after: always !important;
+                break-after: page !important;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .filter-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 992px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .three-column-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+            .filter-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .stats-grid, .filter-grid { grid-template-columns: 1fr; }
+            .upload-row { flex-direction: column; align-items: stretch; }
+        }
+    </style>
 </head>
-<body class="bg-slate-50">
-  <div id="root"></div>
 
-  <script type="text/babel" data-type="module">
-    import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
-    import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-    import {
-      Building2, Clock, AlertTriangle, FileText, Filter, Search, Plus, Trash2, Edit3, X, 
-      ChevronRight, ChevronLeft, CheckCircle2, Clock3, FileSpreadsheet, Save, RotateCcw, 
-      Check, Eye, ArrowUpDown, CheckSquare, Loader2
-    } from 'https://esm.sh/lucide-react@0.344.0';
-
-    function App({ data, updateItem, deleteItem, insertItem }) {
-      const headerEnvelope = useMemo(() => {
-        if (!data || data.length === 0) return null;
-        return (
-          data.find(
-            d =>
-              d.row &&
-              (d.row[0] === 'Timestamp' ||
-                String(d.row[1]).toLowerCase().includes('head post office') ||
-                String(d.row[3]).toLowerCase().includes('counter'))
-          ) || data[0]
-        );
-      }, [data]);
-
-      const headers = useMemo(() => {
-        return headerEnvelope ? headerEnvelope.row : [];
-      }, [headerEnvelope]);
-
-      const rawRows = useMemo(() => {
-        if (!data) return [];
-        return data.filter(
-          d =>
-            d.index_ !== (headerEnvelope ? headerEnvelope.index_ : 0) &&
-            d.row &&
-            d.row.some(c => c !== null && c !== undefined && String(c).trim() !== '')
-        );
-      }, [data, headerEnvelope]);
-
-      const records = useMemo(() => {
-        return rawRows.map(envelope => {
-          const r = envelope.row || [];
-          const timestamp = r[0] ? String(r[0]).trim() : '';
-          const hpo = r[1] ? String(r[1]).trim() : 'Not Specified';
-          const division = r[2] ? String(r[2]).trim() : '';
-          const counterAssigned = r[3] ? String(r[3]).trim() : 'Unassigned';
-
-          const counterDelays = [];
-          const counterSuggestions = [];
-          const processingTimes = [];
-
-          for (let i = 4; i <= 33; i += 3) {
-            const time = r[i];
-            const delay = r[i + 1];
-            const sug = r[i + 2];
-            if (time !== null && time !== undefined && String(time).trim() !== '') {
-              processingTimes.push(String(time).trim());
-            }
-            if (delay !== null && delay !== undefined && String(delay).trim() !== '') {
-              counterDelays.push(String(delay).trim());
-            }
-            if (sug !== null && sug !== undefined && String(sug).trim() !== '') {
-              counterSuggestions.push(String(sug).trim());
-            }
-          }
-
-          return {
-            index_: envelope.index_,
-            raw: r,
-            timestamp, hpo, division, counterAssigned, counterDelays, counterSuggestions,
-            processingTimes
-          };
-        });
-      }, [rawRows]);
-
-      const MASTER_HEAD_OFFICES = useMemo(() => [
-        { sr: 1, ho: 'Akola H.O', division: 'Akola Division' },
-        { sr: 2, ho: 'Amravati H.O', division: 'Amaravati Division' },
-        { sr: 3, ho: 'Paratwada H.O', division: 'Amaravati Division' },
-        { sr: 4, ho: 'Buldana H.O', division: 'Buldana Division' },
-        { sr: 5, ho: 'Khamgaon H.O', division: 'Buldana Division' },
-        { sr: 6, ho: 'Chandrapur H.O', division: 'Chandrapur Division' },
-        { sr: 7, ho: 'Gadchiroli H.O', division: 'Gadchiroli Division' },
-        { sr: 8, ho: 'Nagpur City H.O', division: 'Nagpur City Division' },
-        { sr: 9, ho: 'Nagpur G.P.O.', division: 'Nagpur City Division' },
-        { sr: 10, ho: 'Bhandara H.O', division: 'Nagpur Moffusil Division' },
-        { sr: 11, ho: 'Gondia H.O', division: 'Nagpur Moffusil Division' },
-        { sr: 12, ho: 'Kamthi H.O', division: 'Nagpur Moffusil Division' },
-        { sr: 13, ho: 'Wardha H.O', division: 'Wardha Division' },
-        { sr: 14, ho: 'Yeotmal H.O', division: 'Yeotmal Division' }
-      ], []);
-
-      const DIVISIONS_LIST = useMemo(() => [
-        'All Divisions', 'Akola Division', 'Amaravati Division', 'Buldana Division',
-        'Chandrapur Division', 'Gadchiroli Division', 'Nagpur City Division',
-        'Nagpur Moffusil Division', 'Wardha Division', 'Yeotmal Division'
-      ], []);
-
-      const [selectedDivision, setSelectedDivision] = useState('All Divisions');
-      const [selectedHpoFilter, setSelectedHpoFilter] = useState('ALL');
-      const [selectedDateFilter, setSelectedDateFilter] = useState('');
-      const [counterSortOrder, setCounterSortOrder] = useState('desc');
-
-      // FULLY RESTORED KNOWLEDGE BASE FOR SUGGESTIVE ANSWERS (Q35 to Q58 / Indices 34 to 57)
-      const SUGGESTIVE_ANSWERS = useMemo(() => ({
-        3: ['POSB / Financial Services', 'Mails / Speed Post / BNPL Booking', 'Treasury / Accounts', 'Aadhar Seva Kendra (CELC/UCL)', 'Delivery / Sub-Accounts', 'Other'],
-        time: ['2 minutes', '3 minutes', '5 minutes', '10 minutes', '15 minutes', '30 minutes', '1 day', '2 days', '3 days', '7 days'],
-        delay: ['System lag / Network issue', 'Customer docs incomplete', 'Approvals pending from DO', 'Passbook printer / Hardware issue', 'Customer unfamiliarity with forms', 'Server time-out'],
-        suggestion: ['Smooth functioning of network', 'Customer education & form guidelines', 'Single window approval', 'High-speed printer & scanner', 'SMS alerts for required documents', 'Resolve system glitches'],
-        34: ['Total -162 DD claim cases in SB and 14 cases in PLI/RPLI', 'Near about 200 death claim cases', '10-25 cases', '50+ claim cases', 'Zero pending cases'],
-        35: ['1 DAY in SB and 5 DAYS for end-to-end sanction in PLI', 'Average time 3 days', 'Within 7 days charter', '1-2 days in Finacle/McCamish registration', 'Same-day sanction'],
-        36: ['Passbook / Original Policy Bond / Certificate missing', 'Original Death Certificate / Non-availability of Digital Death Certificate', 'Witness identification / Missing signatures on prescribed forms', 'Proper KYC documents of Legal Heirs / Nominee', 'Succession Certificate / Legal Heir Certificate (in high-value cases)', 'Annexure / Form deficiencies (Affidavit, Letter of Disclaimer, Indemnity Bond)'],
-        37: ['Nomination not registered in old SB cases', 'Legal heir certificate procurement delay', 'Complex affidavit & indemnity bond notarization', 'Unfamiliarity with prescribed claim forms', 'Customer illiteracy regarding required annexures'],
-        38: ['Never', 'Rarely', 'Occasionally exceeds 7 days', 'Frequently exceeds 7-day charter timeline'],
-        39: ['Delay due to mismatch in nominee and depositor name', 'Physical transit of physical dockets between HO and DO', 'Lack of dedicated desk at DO', 'Repeated piecemeal queries raised', 'Staff shortage at Divisional Office'],
-        40: ['Queries regarding mismatch in legal heir name as per AOF and Aadhaar', 'Missing witness identification on claim form', 'Discrepancy in date of death across documents', 'KYC self-attestation missing on dockets', 'Correction in signature of claimant'],
-        41: ['Within a day', '2 to 3 days', 'Procedural delay in corporate agreement verification', 'Smooth onboarding within 48 hours', 'Customer KYC verification delay'],
-        42: ['Smooth API integration', 'Technical support unavailable', 'API manifestation latency', 'EDI auto-manifesting works well', 'Integration issues encountered'],
-        43: ['No issue', 'System not supported', 'Bulk upload timeout', 'Barcode duplicate validation failure', 'Network firewall blocking API calls'],
-        44: ['Smooth automated billing', 'Yes - occasional OTP delivery lag', 'Calculation errors with corporate tariff', 'No delay encountered', 'Manual override required for bulk discount'],
-        45: ['Dedicated pickup schedules adhered to efficiently', 'Mail sits idle awaiting scheduled vehicle', 'Vehicle punctuality needs monitoring', 'Smooth dispatch on schedule'],
-        46: ['Smooth throughput', 'System crashes/hangs with 100+ articles', 'High latency during peak counter hours', 'Fast barcode scanning', 'QR base booking required'],
-        47: ['Yes - resolved within 60 days', 'No - exceeds 60-day window', 'Mostly resolved within 15 days', 'Pending Divisional escalation'],
-        48: ['Lack of door-to-door tracking updates', 'Address incomplete / recipient unavailable', 'Delayed Return to Sender (RTS) processing', 'Delivery manifest mismatch', 'Late scanning at delivery hub'],
-        49: ['Shortage of staff', 'Inadequate training on Finacle/UCL/POS', 'Customer illiteracy/unfamiliarity with forms', 'Heavy seasonal counter rush', 'Passbook updating queues'],
-        50: ['Biometric scanner failures', 'Slow network bandwidth', 'Server time-outs', 'Passbook printer head issues', 'Frequent system hang'],
-        51: ['Redundant physical paperwork', 'Dual entry in register and software', 'Complex approval matrix', 'Excessive physical docket verification', 'Physical token register'],
-        52: ['Shortage of barcoded labels', 'Envelopes shortage', 'New account forms shortage', 'Thermal rolls shortage', 'Stationery supply adequate'],
-        53: ['Conflicting targets', 'Rigid daily cut-off times', 'Inaccurate reporting tools', 'Target vs actual counter time mismatch', 'System clock synchronization issue'],
-        54: ['Drinking water arrangement for customers', 'Inadequate counter ventilation', 'Lack of waiting chairs', 'Unorganized customer flow / lack of token display', 'Air conditioning / fan repair'],
-        55: ['No manual is helpful during failure of system', 'Need robust power backup / UPS', 'Counter lighting and air circulation', 'None / No other specific issues'],
-        56: ['Duplicate physical register entry', 'Manual dispatch book entry', 'Physical SB-3 token register', 'Repeated photocopies of ID proofs', 'Physical claim docket register'],
-        57: ['QR base booking for speed post', 'Assign willing & cooperative official at counter', 'High-speed dedicated leased line network', 'Single window clearance for claims', 'Digital self-service kiosk for claim forms', 'Elimination of duplicate physical register']
-      }), []);
-
-      const getSuggestionsForCol = (colIdx) => {
-        // Remove suggestions for Name of Head Post Office and Division as they are drop-down/readonly
-        if (colIdx === 1 || colIdx === 2) return []; 
-        
-        if (SUGGESTIVE_ANSWERS[colIdx]) return SUGGESTIVE_ANSWERS[colIdx];
-        if (colIdx >= 4 && colIdx <= 33) {
-          const mod = (colIdx - 4) % 3;
-          if (mod === 0) return SUGGESTIVE_ANSWERS.time;
-          if (mod === 1) return SUGGESTIVE_ANSWERS.delay;
-          if (mod === 2) return SUGGESTIVE_ANSWERS.suggestion;
-        }
-        return [];
-      };
-
-      const applySuggestion = (colIdx, sug) => {
-        setQaDraft(prev => {
-          const next = [...prev];
-          while (next.length <= colIdx) next.push(null);
-          const curr = String(next[colIdx] || '').trim();
-          if (!curr || curr === 'null' || curr === 'undefined') {
-            next[colIdx] = sug;
-          } else if (curr.includes(sug)) {
-            const parts = curr.split(',').map(s => s.trim()).filter(s => s && s !== sug);
-            next[colIdx] = parts.join(', ');
-          } else {
-            next[colIdx] = `${curr}, ${sug}`;
-          }
-          return next;
-        });
-      };
-
-      const [activeResponseIndex, setActiveResponseIndex] = useState(null);
-      const [qaDraft, setQaDraft] = useState([]);
-      const [qaFilter, setQaFilter] = useState('all');
-      const [qaSearch, setQaSearch] = useState('');
-      const [isSaveSuccess, setIsSaveSuccess] = useState(false);
-
-      const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-      const [deleteConfirmIndex, setDeleteConfirmIndex] = useState(null);
-
-      const hoSubmissionStats = useMemo(() => {
-        return MASTER_HEAD_OFFICES.map(item => {
-          const matching = records.filter(r => {
-            if (!r.hpo) return false;
-            const cleanR = r.hpo.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const cleanM = item.ho.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const isMatch = cleanR.includes(cleanM) || cleanM.includes(cleanR);
-            if (!isMatch) return false;
-            if (selectedDateFilter && (!r.timestamp || !r.timestamp.startsWith(selectedDateFilter))) return false;
-            return true;
-          });
-          const count = matching.length;
-          let lastRecorded = '-';
-          if (count > 0) {
-            const sorted = [...matching].sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-            lastRecorded = sorted[0].timestamp || '-';
-          }
-          return {
-            sr: item.sr, ho: item.ho, division: item.division,
-            status: count > 0 ? 'Submitted' : 'Pending', countersLogged: count, lastRecorded, matchingRecords: matching
-          };
-        });
-      }, [MASTER_HEAD_OFFICES, records, selectedDateFilter]);
-
-      const kpiMetrics = useMemo(() => {
-        const totalHeadOffices = MASTER_HEAD_OFFICES.length;
-        const surveysSubmitted = hoSubmissionStats.filter(h => h.status === 'Submitted').length;
-        const officesPending = Math.max(0, totalHeadOffices - surveysSubmitted);
-        const totalResponsesLogged = records.length;
-        return { totalHeadOffices, surveysSubmitted, officesPending, totalResponsesLogged };
-      }, [MASTER_HEAD_OFFICES.length, hoSubmissionStats, records.length]);
-
-      const filteredHOList = useMemo(() => {
-        const list = hoSubmissionStats.filter(item => {
-          if (selectedDivision !== 'All Divisions' && item.division !== selectedDivision) return false;
-          if (selectedHpoFilter !== 'ALL' && item.ho !== selectedHpoFilter) return false;
-          return true;
-        });
-        return [...list].sort((a, b) => {
-          if (counterSortOrder === 'asc') return a.countersLogged - b.countersLogged || a.sr - b.sr;
-          return b.countersLogged - a.countersLogged || a.sr - b.sr;
-        });
-      }, [hoSubmissionStats, selectedDivision, selectedHpoFilter, counterSortOrder]);
-
-      const filteredResponses = useMemo(() => {
-        return records.filter(r => {
-          if (selectedDateFilter && (!r.timestamp || !r.timestamp.startsWith(selectedDateFilter))) return false;
-          if (selectedDivision !== 'All Divisions') {
-            const matchedHO = MASTER_HEAD_OFFICES.find(m => {
-              const cleanR = (r.hpo || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-              const cleanM = m.ho.toLowerCase().replace(/[^a-z0-9]/g, '');
-              return cleanR.includes(cleanM) || cleanM.includes(cleanR);
-            });
-            if (!matchedHO || matchedHO.division !== selectedDivision) return false;
-          }
-          if (selectedHpoFilter !== 'ALL' && r.hpo !== selectedHpoFilter) return false;
-          return true;
-        });
-      }, [records, selectedDateFilter, selectedDivision, selectedHpoFilter, MASTER_HEAD_OFFICES]);
-
-      const openQAModal = (indexInFiltered) => {
-        setActiveResponseIndex(indexInFiltered);
-        const resp = filteredResponses[indexInFiltered];
-        if (resp && resp.raw) setQaDraft([...resp.raw]);
-        else setQaDraft([]);
-        setIsSaveSuccess(false);
-      };
-
-      const closeQAModal = () => {
-        setActiveResponseIndex(null);
-        setQaDraft([]);
-        setIsSaveSuccess(false);
-      };
-
-      const handlePrevResponse = () => {
-        if (activeResponseIndex !== null && activeResponseIndex > 0) {
-          const nextIdx = activeResponseIndex - 1;
-          setActiveResponseIndex(nextIdx);
-          const resp = filteredResponses[nextIdx];
-          setQaDraft(resp && resp.raw ? [...resp.raw] : []);
-          setIsSaveSuccess(false);
-        }
-      };
-
-      const handleNextResponse = () => {
-        if (activeResponseIndex !== null && activeResponseIndex < filteredResponses.length - 1) {
-          const nextIdx = activeResponseIndex + 1;
-          setActiveResponseIndex(nextIdx);
-          const resp = filteredResponses[nextIdx];
-          setQaDraft(resp && resp.raw ? [...resp.raw] : []);
-          setIsSaveSuccess(false);
-        }
-      };
-
-      const updateDraftField = (colIdx, val) => {
-        setQaDraft(prev => {
-          const next = [...prev];
-          while (next.length <= colIdx) next.push(null);
-          next[colIdx] = val;
-          return next;
-        });
-      };
-
-      const handleSaveQADraft = async () => {
-        if (activeResponseIndex === null || !filteredResponses[activeResponseIndex]) return;
-        const currentItem = filteredResponses[activeResponseIndex];
-        const maxLen = Math.max(headers.length, qaDraft.length, 58);
-        const updatedRow = new Array(maxLen).fill('');
-
-        for (let i = 0; i < maxLen; i++) {
-          updatedRow[i] = qaDraft[i] !== undefined && qaDraft[i] !== null ? qaDraft[i] : (currentItem.raw[i] !== undefined && currentItem.raw[i] !== null ? currentItem.raw[i] : '');
-        }
-
-        await updateItem(currentItem.index_, updatedRow);
-        setIsSaveSuccess(true);
-        setTimeout(() => setIsSaveSuccess(false), 2500);
-      };
-
-      const handleDeleteRow = async (index_) => {
-        setDeleteConfirmIndex(null);
-        await deleteItem(index_);
-        if (activeResponseIndex !== null) closeQAModal();
-      };
-
-      const initNewDraft = (defaultHo) => {
-        const totalCols = Math.max(headers.length, 58);
-        const arr = new Array(totalCols).fill('');
-        arr[0] = new Date().toISOString().slice(0, 19);
-        arr[1] = defaultHo || 'Akola H.O';
-        const found = MASTER_HEAD_OFFICES.find(m => m.ho === arr[1]);
-        arr[2] = found ? found.division : 'Akola Division';
-        arr[3] = 'POSB / Financial Services';
-        return arr;
-      };
-
-      const [addDraft, setAddDraft] = useState(() => initNewDraft());
-      
-      const updateAddDraftField = (colIdx, val) => {
-        setAddDraft(prev => {
-          const next = [...prev];
-          while (next.length <= colIdx) next.push('');
-          next[colIdx] = val;
-          // Auto link division text box to chosen HPO dropdown
-          if (colIdx === 1) {
-            const matched = MASTER_HEAD_OFFICES.find(m => m.ho === val);
-            if (matched) next[2] = matched.division;
-          }
-          return next;
-        });
-      };
-
-      const applySuggestionToAdd = (colIdx, sug) => {
-        setAddDraft(prev => {
-          const next = [...prev];
-          while (next.length <= colIdx) next.push('');
-          const curr = String(next[colIdx] || '').trim();
-          if (!curr || curr === 'null' || curr === 'undefined') {
-            next[colIdx] = sug;
-          } else if (curr.includes(sug)) {
-            const parts = curr.split(',').map(s => s.trim()).filter(s => s && s !== sug);
-            next[colIdx] = parts.join(', ');
-          } else {
-            next[colIdx] = `${curr}, ${sug}`;
-          }
-          return next;
-        });
-      };
-
-      const handleAddNewRecord = async () => {
-        const maxLen = Math.max(headers.length, addDraft.length, 58);
-        const newRow = new Array(maxLen).fill('');
-        for (let i = 0; i < maxLen; i++) {
-          const val = addDraft[i];
-          newRow[i] = val !== undefined && val !== null && String(val).trim() !== '' ? val : '';
-        }
-        if (!newRow[0]) newRow[0] = new Date().toISOString().slice(0, 19);
-        
-        await insertItem(undefined, newRow);
-        
-        setIsAddModalOpen(false);
-        setAddDraft(initNewDraft());
-      };
-
-      const getQuestionCategory = (idx) => {
-        if (idx <= 3) return 'General Information';
-        if (idx <= 33) return 'Counter Processing & Delays';
-        if (idx <= 40) return 'Deceased Claims Diagnostics';
-        if (idx <= 48) return 'BNPL & Logistics Operations';
-        if (idx <= 55) return 'Ishikawa 6M Lean Factors';
-        return 'Kaizen & Continuous Improvement';
-      };
-
-      const getQuestionLabel = (idx) => {
-        if (headers && headers[idx] && String(headers[idx]).trim()) return String(headers[idx]).trim();
-        if (idx === 0) return 'Timestamp';
-        if (idx === 1) return 'Head Post Office';
-        if (idx === 2) return 'Division / Region';
-        if (idx === 3) return 'Counter Assigned';
-        if (idx >= 4 && idx <= 33) {
-            const n = Math.floor((idx-4)/3) + 1;
-            const m = (idx-4)%3;
-            if (m === 0) return `C${n} - Time Taken`;
-            if (m === 1) return `C${n} - Delay Reason`;
-            return `C${n} - Suggestion`;
-        }
-        return `Question #${idx + 1}`;
-      };
-
-      const activeResponse = activeResponseIndex !== null ? filteredResponses[activeResponseIndex] : null;
-
-      const modalQuestions = useMemo(() => {
-        if (!activeResponse) return [];
-        const totalCols = Math.max(headers.length, qaDraft.length, (activeResponse.raw || []).length, 58);
-        const list = [];
-        for (let i = 0; i < totalCols; i++) {
-          const qText = getQuestionLabel(i);
-          const answerVal = qaDraft[i] !== undefined ? qaDraft[i] : (activeResponse.raw[i] ?? '');
-          const strAnswer = String(answerVal ?? '').trim();
-          const hasAnswer = strAnswer !== '' && strAnswer !== 'null' && strAnswer !== 'undefined';
-
-          if (qaFilter === 'answered' && !hasAnswer) continue;
-          if (qaSearch.trim()) {
-            const q = qaSearch.toLowerCase();
-            const matchesQ = qText.toLowerCase().includes(q);
-            const matchesA = strAnswer.toLowerCase().includes(q);
-            if (!matchesQ && !matchesA) continue;
-          }
-          list.push({ colIdx: i, question: qText, category: getQuestionCategory(i), answer: answerVal ?? '', hasAnswer });
-        }
-        return list;
-      }, [activeResponse, headers, qaDraft, qaFilter, qaSearch]);
-
-      return (
-        <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col antialiased relative">
-          
-          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center justify-between h-16 gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-amber-600 flex items-center justify-center text-white shadow-sm flex-shrink-0">
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-base sm:text-lg font-bold text-slate-900 truncate">
-                        Operational Efficiency, Service Standards & Process Improvement (Head Post Offices) - Nagpur Region
-                      </h1>
-                    </div>
-                    <p className="text-xs text-slate-500 hidden sm:block truncate">
-                      Head Post Office Operations & Survey Responses
-                    </p>
-                  </div>
+<body id="entire-report-page">
+    <!-- PAGE 1 HEADER (Standard Browser View & Page 1 in PDF) -->
+    <header class="govt-header" id="main-navbar">
+        <div class="header-content">
+            <div class="logo-section">
+                <div class="emblem-badge" aria-hidden="true"><i class="fas fa-mail-bulk"></i></div>
+                <div>
+                    <div class="dept-name">DEPARTMENT OF POSTS | INDIA POST</div>
+                    <div class="portal-title">Digital Transaction Booking Dashboard - Nagpur Region</div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => {
-                      setAddDraft(initNewDraft());
-                      setIsAddModalOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-medium transition shadow-sm cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add Response</span>
-                  </button>
-                </div>
-              </div>
             </div>
-          </header>
+            <div style="display: flex; gap: 10px;" data-pdf-ignore="true">
+                <button type="button" onclick="exportWholePageToPDF()" class="btn-pdf" id="pdf-export-btn" title="Export exact 3 pages PDF">
+                    <i class="fas fa-file-pdf"></i> Export PDF (3 Pages)
+                </button>
+                <button type="button" onclick="clearLocalDatabase()" class="btn-ui" title="Reset stored database">
+                    <i class="fas fa-trash-alt"></i> Clear Data
+                </button>
+                <button type="button" onclick="toggleTheme()" class="btn-ui" aria-label="Toggle visual theme">
+                    <i class="fas fa-moon"></i> Theme
+                </button>
+            </div>
+        </div>
+    </header>
 
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-            <section aria-label="Key Performance Indicators">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-slate-300 transition">
-                  <div className="flex items-center justify-between text-slate-500">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-600">Total Offices</span>
-                    <Building2 className="w-4 h-4 text-slate-500" />
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-3xl font-bold text-slate-900">{kpiMetrics.totalHeadOffices}</span>
-                  </div>
-                </div>
+    <main class="container">
+        <!-- ==================== PDF PAGE 1 SHEET ==================== -->
+        <div class="pdf-page-sheet" id="pdf-page-1">
+            <!-- 1. CONTROLS & FILTER STRIP -->
+            <section class="controls-card">
+                <div class="upload-row">
+                    <label class="drop-zone" id="drop-area">
+                        <i class="fas fa-file-csv"></i> <span>Select or Drop Booking CSV (Appends by Date)</span>
+                        <input type="file" id="csv-file-input" accept=".csv" style="display: none;" onchange="handleCSVFile(this.files[0])">
+                    </label>
 
-                <div onClick={() => { if (filteredResponses.length > 0) openQAModal(0); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-emerald-400 hover:shadow-md transition cursor-pointer group">
-                  <div className="flex items-center justify-between text-slate-500">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Submitted</span>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <div className="mt-2">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-3xl font-bold text-emerald-600">{kpiMetrics.surveysSubmitted}</span>
-                      <span className="text-[11px] font-semibold text-emerald-700 group-hover:underline flex items-center gap-1"><Eye className="w-3 h-3" /> View Q&A</span>
+                    <div style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-database" style="color: var(--info);"></i>
+                        <span id="upload-status-text">Upload daily Booking CSVs to append and store in local database.</span>
                     </div>
-                  </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-slate-300 transition">
-                  <div className="flex items-center justify-between text-slate-500">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">Pending</span>
-                    <Clock3 className="w-4 h-4 text-amber-500" />
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-3xl font-bold text-amber-600">{kpiMetrics.officesPending}</span>
-                  </div>
-                </div>
-
-                <div onClick={() => { if (filteredResponses.length > 0) openQAModal(0); }} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-red-400 hover:shadow-md transition cursor-pointer group">
-                  <div className="flex items-center justify-between text-slate-500">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-red-700">Total Responses</span>
-                    <FileSpreadsheet className="w-4 h-4 text-red-600" />
-                  </div>
-                  <div className="mt-2">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-3xl font-bold text-red-600">{kpiMetrics.totalResponsesLogged}</span>
-                      <span className="text-[11px] font-semibold text-red-700 group-hover:underline flex items-center gap-1"><Eye className="w-3 h-3" /> View Q&A</span>
+                <!-- Dynamic Filters -->
+                <div class="filter-grid">
+                    <div class="form-group">
+                        <label for="filter-from-date"><i class="fas fa-calendar-alt"></i> From Date</label>
+                        <input type="date" id="filter-from-date" class="form-control" value="2026-09-12" onchange="applyFilters()">
                     </div>
-                  </div>
+                    <div class="form-group">
+                        <label for="filter-to-date"><i class="fas fa-calendar-check"></i> To Date</label>
+                        <input type="date" id="filter-to-date" class="form-control" value="2026-09-12" onchange="applyFilters()">
+                    </div>
+                    <div class="form-group">
+                        <label for="filter-division"><i class="fas fa-sitemap"></i> Division</label>
+                        <select id="filter-division" class="form-control" onchange="onDivisionChange()">
+                            <option value="ALL">All Divisions (Nagpur Region)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filter-subdivision"><i class="fas fa-map-marker-alt"></i> Sub Division</label>
+                        <select id="filter-subdivision" class="form-control" onchange="applyFilters()">
+                            <option value="ALL">All Sub Divisions</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filter-officetype"><i class="fas fa-tags"></i> Office Type</label>
+                        <select id="filter-officetype" class="form-control" onchange="applyFilters()">
+                            <option value="ALL">All Office Types</option>
+                        </select>
+                    </div>
                 </div>
-              </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-5 border-b border-slate-200 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-red-600" /> Submission Position
-                    </h2>
-                  </div>
+            <!-- 2. 4 KPI STAT CARDS -->
+            <section class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-building"></i></div>
+                    <div class="stat-label">Active Filtered Offices</div>
+                    <div class="stat-value" id="s-offices">0</div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-slate-100">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1"><Filter className="w-3 h-3 text-red-600" /> Postal Division</label>
-                    <select value={selectedDivision} onChange={e => setSelectedDivision(e.target.value)} className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-red-500">
-                      {DIVISIONS_LIST.map(div => (<option key={div} value={div}>{div}</option>))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1"><Building2 className="w-3 h-3 text-red-600" /> Head Post Office</label>
-                    <select value={selectedHpoFilter} onChange={e => setSelectedHpoFilter(e.target.value)} className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-red-500">
-                      <option value="ALL">All Head Post Offices</option>
-                      {MASTER_HEAD_OFFICES.map(h => (<option key={h.ho} value={h.ho}>{h.ho}</option>))}
-                    </select>
-                  </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                    <div class="stat-label">Cash Transactions</div>
+                    <div class="stat-value" id="s-cash">0</div>
                 </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="bg-slate-50 text-slate-700 uppercase font-semibold border-b border-slate-200">
-                    <tr>
-                      <th className="px-4 py-3 w-12 text-center">Sr</th>
-                      <th className="px-4 py-3 whitespace-nowrap">Head Post Office (HO)</th>
-                      <th className="px-4 py-3 whitespace-nowrap">Postal Division</th>
-                      <th className="px-4 py-3 whitespace-nowrap">Status</th>
-                      <th className="px-4 py-3 text-center whitespace-nowrap cursor-pointer hover:bg-slate-100" onClick={() => setCounterSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}>
-                        <span className="inline-flex items-center justify-center gap-1.5 text-slate-800 font-bold">Counters Logged <ArrowUpDown className="w-3.5 h-3.5 text-red-600" /></span>
-                      </th>
-                      <th className="px-4 py-3 text-right whitespace-nowrap">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {filteredHOList.map(item => {
-                      const handleOfficeClick = () => {
-                        const matchIdx = filteredResponses.findIndex(r => r.hpo === item.ho);
-                        if (matchIdx !== -1) { openQAModal(matchIdx); } 
-                        else {
-                          const allIdx = records.findIndex(r => r.hpo === item.ho);
-                          if (allIdx !== -1) {
-                            setSelectedHpoFilter(item.ho); setSelectedDivision('All Divisions');
-                            openQAModal(records.findIndex(r => r.hpo === item.ho));
-                          } else {
-                            setAddDraft(initNewDraft(item.ho));
-                            setIsAddModalOpen(true);
-                          }
-                        }
-                      };
-
-                      return (
-                        <tr key={item.sr} className="hover:bg-red-50/50 transition cursor-pointer group" onClick={handleOfficeClick}>
-                          <td className="px-4 py-3 font-mono text-center text-slate-500 font-semibold group-hover:text-red-700">{item.sr}</td>
-                          <td className="px-4 py-3 font-bold text-slate-900 whitespace-nowrap group-hover:text-red-700">
-                            <span className="flex items-center gap-1.5">
-                              <Building2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-red-600" />
-                              <span className="underline decoration-dotted underline-offset-2">{item.ho}</span>
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{item.division}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {item.status === 'Submitted' ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"><CheckCircle2 className="w-3 h-3" /> Submitted</span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"><Clock3 className="w-3 h-3" /> Pending</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center font-bold text-slate-800 whitespace-nowrap">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs ${item.countersLogged > 0 ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-slate-100 text-slate-500'}`}>
-                              {item.countersLogged}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap">
-                            {item.countersLogged > 0 ? (
-                              <button type="button" onClick={(e) => { e.stopPropagation(); handleOfficeClick(); }} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium cursor-pointer"><Eye className="w-3 h-3" /> View Q&A</button>
-                            ) : (
-                              <button type="button" onClick={(e) => { e.stopPropagation(); setAddDraft(initNewDraft(item.ho)); setIsAddModalOpen(true); }} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-300 hover:bg-slate-100 text-slate-600 text-xs font-medium cursor-pointer"><Plus className="w-3 h-3" /> Log Survey</button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-credit-card"></i></div>
+                    <div class="stat-label">Digital Transactions</div>
+                    <div class="stat-value" id="s-digital">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+                    <div class="stat-label">Digital Adoption Rate</div>
+                    <div class="stat-value" id="s-pct">0.00%</div>
+                </div>
             </section>
-          </main>
 
-          {/* TWO-SIDED QUESTION & ANSWER POP-UP MODAL (EDIT VIEW) */}
-          {activeResponse && (
-            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-              <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-300">
-                <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 flex-shrink-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center text-white flex-shrink-0"><Building2 className="w-4 h-4" /></div>
-                    <div className="min-w-0">
-                      <h3 className="text-sm sm:text-base font-bold text-white truncate">{activeResponse.hpo} — Survey Q&A</h3>
+            <!-- 3. DIGITAL TRANSACTION REPORT SECTION -->
+            <section class="report-banner-card" id="capture-summary-card">
+                <div class="banner-header">
+                    <div>
+                        <div class="banner-title" id="banner-title-text">Digital Transaction Report - Nagpur Region</div>
+                        <div class="banner-subtitle" id="banner-date-range">Report Dated from 12.09.2026 to 12.09.2026</div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700 mr-2">
-                        <button onClick={handlePrevResponse} disabled={activeResponseIndex <= 0} className="p-1.5 text-slate-300 hover:text-white rounded-md hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition" title="Previous Survey">
-                          <ChevronLeft className="w-4 h-4" />
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;" data-html2canvas-ignore="true" data-pdf-ignore="true">
+                        <button type="button" class="btn-action" onclick="copyBannerReportImage()" title="Copy entire section as an image">
+                            <i class="fas fa-camera"></i> <span id="copy-img-btn-text">Copy to Image</span>
                         </button>
-                        <span className="text-[11px] font-semibold text-slate-300 px-2 min-w-[50px] text-center">
-                          {activeResponseIndex + 1} / {filteredResponses.length}
+                        <button type="button" class="btn-excel" onclick="exportDivisionSummaryExcel()">
+                            <i class="fas fa-file-excel"></i> Export Excel
+                        </button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="division-summary-table" id="division-summary-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; width: 35%;">Office / Unit Name</th>
+                                <th style="width: 17%;">Total Transactions</th>
+                                <th style="width: 16%;">Cash (Cnt)</th>
+                                <th style="width: 17%;">Digital Transactions</th>
+                                <th style="width: 15%;">Percentage %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="division-summary-tbody">
+                            <tr><td colspan="5" style="text-align: center; padding: 28px; color: var(--text-tertiary);">Upload Booking CSV above to view summary report.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- ==================== PDF PAGE 2 SHEET ==================== -->
+        <div class="pdf-page-sheet" id="pdf-page-2">
+            <!-- Header for Page 2 in PDF -->
+            <header class="govt-header pdf-page-header">
+                <div class="header-content">
+                    <div class="logo-section">
+                        <div class="emblem-badge" aria-hidden="true"><i class="fas fa-mail-bulk"></i></div>
+                        <div>
+                            <div class="dept-name">DEPARTMENT OF POSTS | INDIA POST</div>
+                            <div class="portal-title">Sub-Division Consolidation & Office Adoption Matrix - Nagpur Region</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 4. SUBDIVISION CONSOLIDATED BREAKDOWN (TOP 5) -->
+            <section class="card">
+                <div class="chart-header" style="border-bottom: none; margin-bottom: 12px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 15px; font-weight: 800;"><i class="fas fa-layer-group" style="color: var(--primary); margin-right: 8px;"></i>Sub-Division Consolidated Breakdown</span>
+                        <span id="subdiv-count-badge" style="font-size: 11px; font-weight: 700; background: var(--bg-surface-2); padding: 2px 8px; border-radius: var(--radius-full); border: 1px solid var(--border);">Showing Top 5</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;" data-pdf-ignore="true">
+                        <button type="button" id="subdiv-toggle-btn" class="btn-action" onclick="toggleSubDivExpand()">
+                            <i class="fas fa-expand-alt"></i> Show All Sub-Divisions
+                        </button>
+                        <button type="button" class="btn-excel" onclick="exportSubdivisionExcel()">
+                            <i class="fas fa-file-excel"></i> Export Excel
+                        </button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12.5px;" id="subdivision-table-el">
+                        <thead>
+                            <tr style="background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff;">
+                                <th style="padding: 10px 14px; text-align: left; width: 45px;">SL</th>
+                                <th style="padding: 10px 14px; text-align: left;">Sub Division</th>
+                                <th style="padding: 10px 14px; text-align: center;">Offices</th>
+                                <th style="padding: 10px 14px; text-align: right;">Cash (Cnt)</th>
+                                <th style="padding: 10px 14px; text-align: right;">SBI POS (Cnt)</th>
+                                <th style="padding: 10px 14px; text-align: right;">QR / UPI (Cnt)</th>
+                                <th style="padding: 10px 14px; text-align: right;">Total Digital</th>
+                                <th style="padding: 10px 14px; text-align: center;">Digital %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subdivision-table">
+                            <tr><td colspan="8" style="text-align: center; padding: 25px; color: var(--text-tertiary);">No data loaded. Select your Booking CSV file above.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 5. OFFICES PENDING 75% DIGITAL ADOPTION (OFFICE TYPE MATRIX) -->
+            <section class="card">
+                <div class="chart-header" style="border-bottom: none; margin-bottom: 12px; flex-wrap: wrap;">
+                    <div>
+                        <span style="font-size: 15px; font-weight: 800; color: var(--danger);">
+                            <i class="fas fa-exclamation-circle" style="color: var(--danger); margin-right: 8px;"></i>
+                            Offices Pending 75% Digital Adoption (Office-Type Wise)
                         </span>
-                        <button onClick={handleNextResponse} disabled={activeResponseIndex >= filteredResponses.length - 1} className="p-1.5 text-slate-300 hover:text-white rounded-md hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition" title="Next Survey">
-                          <ChevronRight className="w-4 h-4" />
+                        <span id="pending75-badge" style="margin-left: 8px; font-size: 11px; padding: 2px 8px; border-radius: var(--radius-full); background: var(--danger-light); color: var(--danger); font-weight: 700;">0 Shortfall Offices</span>
+                    </div>
+                    <div data-pdf-ignore="true">
+                        <button type="button" class="btn-excel" onclick="exportPendingMatrixExcel()">
+                            <i class="fas fa-file-excel"></i> Export Matrix Excel
                         </button>
                     </div>
-
-                    <div className="w-px h-5 bg-slate-700 hidden sm:block"></div>
-
-                    <button onClick={() => setDeleteConfirmIndex(activeResponse.index_)} className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition cursor-pointer"><Trash2 className="w-5 h-5" /></button>
-                    <button onClick={closeQAModal} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"><X className="w-5 h-5" /></button>
-                  </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-100 text-slate-700 text-xs font-bold border-b border-slate-200 sticky top-0 z-10">
-                      <tr>
-                        <th className="px-4 py-3 w-16 text-center">#</th>
-                        <th className="px-4 py-3 w-5/12">Survey Question</th>
-                        <th className="px-4 py-3 w-7/12">Recorded Answer (Editable)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 text-xs">
-                      {modalQuestions.map((item) => (
-                        <tr key={item.colIdx} className="hover:bg-slate-50/70 transition">
-                          <td className="px-4 py-3.5 align-top text-center font-mono font-bold text-slate-700 bg-slate-50 border-r border-slate-100">Q{item.colIdx + 1}</td>
-                          <td className="px-4 py-3.5 align-top">
-                            <span className="inline-block text-[10px] font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200 mb-1">{item.category}</span>
-                            <p className="font-semibold text-slate-900 text-xs">{item.question}</p>
-                          </td>
-                          <td className="px-4 py-3.5 align-top">
-                            
-                            {item.colIdx === 1 ? (
-                              <select
-                                value={item.answer ?? ''}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setQaDraft(prev => {
-                                    const next = [...prev];
-                                    while(next.length <= 2) next.push(null);
-                                    next[1] = val;
-                                    const match = MASTER_HEAD_OFFICES.find(m => m.ho === val);
-                                    if (match) next[2] = match.division;
-                                    return next;
-                                  });
-                                }}
-                                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                              >
-                                <option value="" disabled>Select Head Post Office</option>
-                                {MASTER_HEAD_OFFICES.map(h => <option key={h.ho} value={h.ho}>{h.ho}</option>)}
-                              </select>
-                            ) : item.colIdx === 2 ? (
-                              <input
-                                type="text"
-                                readOnly
-                                value={item.answer ?? ''}
-                                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-600 bg-slate-100 cursor-not-allowed focus:outline-none"
-                              />
-                            ) : (
-                              <textarea rows="2" value={item.answer ?? ''} onChange={(e) => updateDraftField(item.colIdx, e.target.value)} className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-500" />
-                            )}
-
-                            {getSuggestionsForCol(item.colIdx).length > 0 && (
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                    {getSuggestionsForCol(item.colIdx).map((sug, i) => (
-                                        <button key={i} onClick={() => applySuggestion(item.colIdx, sug)} className="text-[10px] bg-slate-100 hover:bg-red-50 px-2 py-0.5 rounded border border-slate-200 hover:border-red-200 cursor-pointer text-slate-600 transition">+{sug}</button>
-                                    ))}
-                                </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div class="table-wrapper" style="border: 1px solid var(--border); border-radius: var(--radius);">
+                    <table class="matrix-table" id="pending-matrix-table">
+                        <thead>
+                            <tr>
+                                <th rowspan="2" style="text-align: left; width: 22%;">Division Name</th>
+                                <th colspan="2" style="background: #ede9fe; color: #5b21b6; border-bottom: 1px solid var(--border);">HPO / GPO</th>
+                                <th colspan="2" style="background: #fae8ff; color: #86198f; border-bottom: 1px solid var(--border);">RMS</th>
+                                <th colspan="2" style="background: #e0f2fe; color: #075985; border-bottom: 1px solid var(--border);">SPO</th>
+                                <th colspan="2" style="background: #f1f5f9; color: #334155; border-bottom: 1px solid var(--border);">BPO</th>
+                            </tr>
+                            <tr>
+                                <th style="width: 9%; background: #ede9fe; color: #5b21b6;">No. of Offices</th>
+                                <th style="width: 10%; background: #ede9fe; color: #5b21b6;">Shortfall Offices</th>
+                                <th style="width: 9%; background: #fae8ff; color: #86198f;">No. of Offices</th>
+                                <th style="width: 10%; background: #fae8ff; color: #86198f;">Shortfall Offices</th>
+                                <th style="width: 9%; background: #e0f2fe; color: #075985;">No. of Offices</th>
+                                <th style="width: 10%; background: #e0f2fe; color: #075985;">Shortfall Offices</th>
+                                <th style="width: 10%; background: #f1f5f9; color: #334155;">No. of Offices</th>
+                                <th style="width: 11%; background: #f1f5f9; color: #334155;">Shortfall Offices</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pending-matrix-tbody">
+                            <tr><td colspan="9" style="text-align: center; padding: 25px; color: var(--text-tertiary);">Upload Booking CSV above to calculate shortfall matrix.</td></tr>
+                        </tbody>
+                    </table>
                 </div>
-
-                <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                      <button onClick={handlePrevResponse} disabled={activeResponseIndex <= 0} className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-medium text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition">
-                        <ChevronLeft className="w-4 h-4" /> Previous
-                      </button>
-                      <button onClick={handleNextResponse} disabled={activeResponseIndex >= filteredResponses.length - 1} className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-medium text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition">
-                        Next <ChevronRight className="w-4 h-4" />
-                      </button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                      <button onClick={closeQAModal} className="px-4 py-1.5 border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-medium text-slate-700 cursor-pointer">Close</button>
-                      <button onClick={handleSaveQADraft} className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold cursor-pointer">Save Changes</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* FULL "LOG NEW RESPONSE" ADD MODAL */}
-          {isAddModalOpen && (
-            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-              <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-300 animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 flex-shrink-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white flex-shrink-0">
-                      <Plus className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-sm sm:text-base font-bold text-white truncate">
-                        Log New Head Post Office Survey Response
-                      </h3>
-                      <p className="text-xs text-slate-400 truncate">
-                        Complete operational parameters & lean questions with suggestive answers
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setIsAddModalOpen(false)}
-                    className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-100 text-slate-700 text-xs font-bold border-b border-slate-200 sticky top-0 z-10">
-                      <tr>
-                        <th className="px-4 py-3 w-16 text-center whitespace-nowrap">#</th>
-                        <th className="px-4 py-3 w-5/12 whitespace-nowrap">Survey Question & Parameter</th>
-                        <th className="px-4 py-3 w-7/12 whitespace-nowrap">Response Answer</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 text-xs">
-                      {Array.from({ length: Math.max(headers.length, addDraft.length, 58) }).map((_, i) => {
-                        const qText = getQuestionLabel(i);
-                        const ansVal = addDraft[i] ?? '';
-                        const strAns = String(ansVal).trim();
-                        const category = getQuestionCategory(i);
-                        const suggestions = getSuggestionsForCol(i);
-                        const isLong = strAns.length > 65 || i >= 34;
-
-                        return (
-                          <tr key={i} className="hover:bg-slate-50/70 transition">
-                            <td className="px-4 py-3.5 align-top text-center">
-                              <span className="inline-flex items-center justify-center w-8 h-6 rounded bg-slate-100 font-mono text-[11px] font-bold text-slate-700 border border-slate-200">
-                                Q{i + 1}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3.5 align-top space-y-1">
-                              <div>
-                                <span className="inline-block text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                  {category}
-                                </span>
-                              </div>
-                              <p className="font-semibold text-slate-900 text-xs leading-relaxed">
-                                {qText}
-                              </p>
-                            </td>
-                            <td className="px-4 py-3.5 align-top space-y-2">
-                              
-                              {i === 1 ? (
-                                <select
-                                  value={ansVal}
-                                  onChange={e => updateAddDraftField(i, e.target.value)}
-                                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                >
-                                  <option value="" disabled>Select Head Post Office...</option>
-                                  {MASTER_HEAD_OFFICES.map(h => (
-                                    <option key={h.ho} value={h.ho}>{h.ho} ({h.division})</option>
-                                  ))}
-                                </select>
-                              ) : i === 2 ? (
-                                <input
-                                  type="text"
-                                  readOnly
-                                  value={ansVal}
-                                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-600 bg-slate-100 cursor-not-allowed focus:outline-none"
-                                />
-                              ) : isLong ? (
-                                <textarea
-                                  rows={Math.min(4, Math.max(2, Math.ceil(strAns.length / 50)))}
-                                  value={ansVal}
-                                  onChange={e => updateAddDraftField(i, e.target.value)}
-                                  placeholder="Type or click suggestive answers below..."
-                                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y leading-relaxed"
-                                />
-                              ) : (
-                                <input
-                                  type="text"
-                                  value={ansVal}
-                                  onChange={e => updateAddDraftField(i, e.target.value)}
-                                  placeholder="Type or click suggestive answers below..."
-                                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                />
-                              )}
-
-                              {suggestions.length > 0 && (
-                                <div className="pt-1">
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    {suggestions.map((sug, sIdx) => {
-                                      const isContained = strAns.toLowerCase().includes(sug.toLowerCase());
-                                      return (
-                                        <button
-                                          key={sIdx}
-                                          type="button"
-                                          onClick={() => applySuggestionToAdd(i, sug)}
-                                          className={`text-[10px] px-2 py-0.5 rounded-md border transition cursor-pointer flex items-center gap-1 ${
-                                            isContained
-                                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold'
-                                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200'
-                                          }`}
-                                        >
-                                          <span>{isContained ? '✓' : '+'} {sug}</span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddModalOpen(false)}
-                    className="px-4 py-1.5 border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-medium text-slate-700 transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAddNewRecord}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" /> Submit Survey Response
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* DELETE CONFIRMATION MODAL */}
-          {deleteConfirmIndex !== null && (
-            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white rounded-xl max-w-sm w-full p-5 shadow-xl border border-slate-200">
-                <div className="flex items-center gap-3 text-red-600 mb-3"><AlertTriangle className="w-6 h-6" /><h3 className="text-sm font-bold text-slate-900">Confirm Deletion</h3></div>
-                <p className="text-xs text-slate-600 mb-4">Are you sure you want to permanently delete this row? This change will persist immediately to the Google Sheet.</p>
-                <div className="flex items-center justify-end gap-2">
-                  <button onClick={() => setDeleteConfirmIndex(null)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 cursor-pointer">Cancel</button>
-                  <button onClick={() => handleDeleteRow(deleteConfirmIndex)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold cursor-pointer">Delete Row</button>
-                </div>
-              </div>
-            </div>
-          )}
+            </section>
         </div>
-      );
-    }
 
-    // ============================================================================
-    // GOOGLE SHEETS LIVE DATA WRAPPER
-    // ============================================================================
-    function DashboardWrapper() {
-      // ⚠️ YOUR PROVIDED GOOGLE APPS SCRIPT WEB APP URL IS HERE ⚠️
-      const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby2CQg6B7-OlJuGFC8B_pIUdfjlB9TBFYebe4lOYrYuCORSTpddEX2UwbsytzEJVjEnvg/exec';
+        <!-- ==================== PDF PAGE 3 SHEET ==================== -->
+        <div class="pdf-page-sheet" id="pdf-page-3">
+            <!-- Header for Page 3 in PDF -->
+            <header class="govt-header pdf-page-header">
+                <div class="header-content">
+                    <div class="logo-section">
+                        <div class="emblem-badge" aria-hidden="true"><i class="fas fa-mail-bulk"></i></div>
+                        <div>
+                            <div class="dept-name">DEPARTMENT OF POSTS | INDIA POST</div>
+                            <div class="portal-title">Office Performance Breakdown & Adoption Extremes - Nagpur Region</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
 
-      const [data, setData] = useState([]);
-      const [isLoading, setIsLoading] = useState(true);
-      const [isSyncing, setIsSyncing] = useState(false);
+            <!-- 6. THREE-COLUMN PERFORMANCE RANKINGS (WITH DIVISION NAME) -->
+            <section class="three-column-grid">
+                <div class="chart-card">
+                    <div class="chart-header" style="border-bottom-color: #059669;">
+                        <span><i class="fas fa-star" style="color: #059669; margin-right: 6px;"></i><span id="rank-card-1-title">100% Achieved Offices (Top 5)</span></span>
+                        <button type="button" class="btn-excel" data-pdf-ignore="true" style="padding: 3px 8px; font-size: 11px;" onclick="exportListExcel('achieved')">
+                            <i class="fas fa-download"></i> Excel
+                        </button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 6px 10px; background: var(--bg-surface-2); font-weight: 700; font-size: 11px; color: var(--text-secondary);">
+                        <span>SL</span><span style="flex: 1; margin-left: 10px;">Office & Division</span><span>Status</span>
+                    </div>
+                    <ul class="performance-list" id="performance-list">
+                        <li style="padding: 15px; text-align: center; color: var(--text-tertiary);">Upload CSV to calculate</li>
+                    </ul>
+                </div>
 
-      // Fetch Data (GET)
-      const fetchSheetData = async () => {
-        setIsLoading(true);
-        try {
-          const res = await fetch(APP_SCRIPT_URL);
-          const json = await res.json();
-          setData(json);
-        } catch (e) {
-          console.error("Error fetching data from Google Sheets:", e);
-          alert("Failed to connect to Google Sheets. Check your App Script URL and ensure your Sheet is named correctly ('Data').");
-        }
-        setIsLoading(false);
-      };
+                <div class="chart-card">
+                    <div class="chart-header" style="border-bottom-color: #dc2626;">
+                        <span><i class="fas fa-exclamation-triangle" style="color: #dc2626; margin-right: 6px;"></i><span id="rank-card-2-title">Cash Only Offices (Top 5)</span></span>
+                        <button type="button" class="btn-excel" data-pdf-ignore="true" style="padding: 3px 8px; font-size: 11px; background: #dc2626;" onclick="exportListExcel('cashonly')">
+                            <i class="fas fa-download"></i> Excel
+                        </button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 6px 10px; background: var(--bg-surface-2); font-weight: 700; font-size: 11px; color: var(--text-secondary);">
+                        <span>SL</span><span style="flex: 1; margin-left: 10px;">Office & Division</span><span>Cash Txn</span>
+                    </div>
+                    <ul class="performance-list" id="nil-performance-list">
+                        <li style="padding: 15px; text-align: center; color: var(--text-tertiary);">Upload CSV to calculate</li>
+                    </ul>
+                </div>
 
-      useEffect(() => {
-        fetchSheetData();
-      }, []);
-
-      // Update Data (POST)
-      const updateItem = async (index_, newRow) => {
-        setIsSyncing(true);
-        setData(prev => prev.map(d => d.index_ === index_ ? { ...d, row: newRow } : d));
-        try {
-          await fetch(APP_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'update', index_, row: newRow }) 
-          });
-        } catch (e) {
-          console.error("Update failed", e);
-          alert("Failed to save changes to Google Sheet.");
-          fetchSheetData(); 
-        }
-        setIsSyncing(false);
-      };
-
-      // Delete Data (POST)
-      const deleteItem = async (index_) => {
-        setIsSyncing(true);
-        setData(prev => prev.filter(d => d.index_ !== index_)); 
-        try {
-          await fetch(APP_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'delete', index_ })
-          });
-          await fetchSheetData(); 
-        } catch (e) {
-          console.error("Delete failed", e);
-          alert("Failed to delete from Google Sheet.");
-          fetchSheetData();
-        }
-        setIsSyncing(false);
-      };
-
-      // Insert Data (POST)
-      const insertItem = async (_, newRow) => {
-        setIsSyncing(true);
-        try {
-          await fetch(APP_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'insert', row: newRow })
-          });
-          await fetchSheetData(); 
-        } catch (e) {
-          console.error("Insert failed", e);
-          alert("Failed to add new record to Google Sheet.");
-        }
-        setIsSyncing(false);
-      };
-
-      if (isLoading) {
-        return (
-          <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center space-y-4">
-            <Loader2 className="w-10 h-10 text-red-600 animate-spin" />
-            <p className="text-sm font-semibold text-slate-600">Connecting to Google Sheets...</p>
-          </div>
-        );
-      }
-
-      return (
-        <div className="relative">
-          {isSyncing && (
-            <div className="fixed top-4 right-4 z-50 bg-slate-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-xs font-semibold animate-in fade-in zoom-in-95 duration-200">
-               <Loader2 className="w-4 h-4 animate-spin text-red-400" /> Syncing to Google Sheet...
-            </div>
-          )}
-          
-          <App 
-            data={data} 
-            updateItem={updateItem} 
-            deleteItem={deleteItem} 
-            insertItem={insertItem} 
-          />
+                <div class="chart-card">
+                    <div class="chart-header" style="border-bottom-color: #d97706;">
+                        <span><i class="fas fa-percentage" style="color: #d97706; margin-right: 6px;"></i><span id="rank-card-3-title">Bottom 5 Partial Digital Adoption</span></span>
+                        <button type="button" class="btn-excel" data-pdf-ignore="true" style="padding: 3px 8px; font-size: 11px; background: #d97706;" onclick="exportListExcel('partial')">
+                            <i class="fas fa-download"></i> Excel
+                        </button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 6px 10px; background: var(--bg-surface-2); font-weight: 700; font-size: 11px; color: var(--text-secondary);">
+                        <span>SL</span><span style="flex: 1; margin-left: 10px;">Office & Division</span><span>Digital %</span>
+                    </div>
+                    <ul class="performance-list" id="bottom-performance-list">
+                        <li style="padding: 15px; text-align: center; color: var(--text-tertiary);">Upload CSV to calculate</li>
+                    </ul>
+                </div>
+            </section>
         </div>
-      );
-    }
+    </main>
 
-    const root = createRoot(document.getElementById('root'));
-    root.render(<DashboardWrapper />);
-  </script>
+    <!-- DRILLDOWN MODAL -->
+    <div class="modal-overlay" id="shortfall-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h3 style="font-size: 15px; font-weight: 800;" id="modal-title">Shortfall Offices</h3>
+                    <p style="font-size: 11.5px; opacity: 0.85;" id="modal-subtitle">Digital Adoption &lt; 75%</p>
+                </div>
+                <button type="button" onclick="closeModal()" style="background: transparent; border: none; color: #fff; font-size: 18px; cursor: pointer;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="table-wrapper">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px;" id="modal-table">
+                        <thead>
+                            <tr style="background: var(--bg-surface-2); border-bottom: 2px solid var(--border);">
+                                <th style="padding: 8px; text-align: left;">SL</th>
+                                <th style="padding: 8px; text-align: left;">Office Name</th>
+                                <th style="padding: 8px; text-align: left;">Sub Division</th>
+                                <th style="padding: 8px; text-align: center;">Type</th>
+                                <th style="padding: 8px; text-align: right;">Cash</th>
+                                <th style="padding: 8px; text-align: right;">Digital</th>
+                                <th style="padding: 8px; text-align: right;">Total</th>
+                                <th style="padding: 8px; text-align: center;">Digital %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-excel" onclick="exportModalListExcel()">
+                    <i class="fas fa-file-excel"></i> Export List to Excel
+                </button>
+                <button type="button" class="btn-ui" style="background: var(--bg-surface-2); color: var(--text-primary); border-color: var(--border);" onclick="closeModal()">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SINGLE OFFICE DETAIL POPUP MODAL -->
+    <div class="modal-overlay" id="office-detail-modal">
+        <div class="modal-card" style="max-width: 650px;">
+            <div class="modal-header">
+                <div>
+                    <h3 style="font-size: 15.5px; font-weight: 800;" id="od-title">Office Name</h3>
+                    <p style="font-size: 12px; opacity: 0.9;" id="od-subtitle">Office ID: -</p>
+                </div>
+                <button type="button" onclick="closeOfficeModal()" style="background: transparent; border: none; color: #fff; font-size: 18px; cursor: pointer;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 18px; background: var(--bg-surface-2); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border);">
+                    <div>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Division</span>
+                        <div style="font-weight: 700; font-size: 13.5px;" id="od-div">-</div>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Sub Division</span>
+                        <div style="font-weight: 700; font-size: 13.5px;" id="od-sub">-</div>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Office Type</span>
+                        <div id="od-type">-</div>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Digital Adoption (Period)</span>
+                        <div style="font-weight: 800; font-size: 15px;" id="od-pct">-</div>
+                    </div>
+                </div>
+
+                <h4 style="font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary);"><i class="fas fa-list-alt" style="color: var(--primary); margin-right: 6px;"></i>Period Transaction Breakdown</h4>
+                <div class="table-wrapper" style="border: 1px solid var(--border); border-radius: var(--radius-sm);">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+                        <tbody>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px 12px; font-weight: 600;">Cash Transactions (Cnt)</td>
+                                <td style="padding: 8px 12px; text-align: right; font-weight: 700; color: var(--danger);" id="od-cash">0</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px 12px; font-weight: 600;">SBI POS Card / Credit / Debit (Cnt)</td>
+                                <td style="padding: 8px 12px; text-align: right; font-weight: 700;" id="od-pos">0</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 8px 12px; font-weight: 600;">DQR / SBI BharatQR / UPI (Cnt)</td>
+                                <td style="padding: 8px 12px; text-align: right; font-weight: 700;" id="od-qr">0</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border); background: var(--bg-surface-2);">
+                                <td style="padding: 8px 12px; font-weight: 700; color: var(--primary);">Total Digital Transactions</td>
+                                <td style="padding: 8px 12px; text-align: right; font-weight: 800; color: var(--primary);" id="od-digital">0</td>
+                            </tr>
+                            <tr style="background: var(--bg-surface-2); font-weight: 800;">
+                                <td style="padding: 8px 12px;">Grand Total Transactions</td>
+                                <td style="padding: 8px 12px; text-align: right; font-size: 14px;" id="od-total">0</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-excel" onclick="exportSingleOfficeExcel()">
+                    <i class="fas fa-file-excel"></i> Export Office Data
+                </button>
+                <button type="button" class="btn-ui" style="background: var(--bg-surface-2); color: var(--text-primary); border-color: var(--border);" onclick="closeOfficeModal()">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div>Department of Posts | Nagpur Region Digital Transaction Portal</div>
+        <div>Offline Processing Engine (Date-Wise Appending IndexedDB Local Database)</div>
+    </footer>
+
+    <script>
+        let rawParsedRecords = [];
+        let aggregatedActiveRecords = [];
+        let globalDivisions = [];
+        let globalSubDivMap = {};
+        let globalOfficeTypes = [];
+
+        let lastFilteredRecords = [];
+        let lastSummaryRows = [];
+        let lastSubDivList = [];
+        let isSubDivExpanded = false;
+
+        let modalActiveOffices = [];
+        let modalActiveTitle = "";
+        let activeOfficeDetail = null;
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function safeNum(val) {
+            const n = parseFloat(val);
+            return Number.isFinite(n) ? n : 0;
+        }
+
+        /* ---------------- STRICT 3-PAGE PDF GENERATOR ---------------- */
+        async function exportWholePageToPDF() {
+            const btn = document.getElementById('pdf-export-btn');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating 3-Page PDF...';
+            btn.disabled = true;
+
+            // 1. Force Sub-Divisions to Top 5 mode during PDF export
+            const originalSubDivExpanded = isSubDivExpanded;
+            if (isSubDivExpanded) {
+                isSubDivExpanded = false;
+                renderSubDivTable();
+            }
+
+            // 2. Set rankings to Top 5 / Bottom 5
+            renderBottomRankings(lastFilteredRecords, true);
+
+            // 3. Switch layout into 3-Page fixed A4 landscape width
+            document.body.classList.add('pdf-export-mode');
+
+            const fromDate = document.getElementById('filter-from-date').value || 'start';
+            const toDate = document.getElementById('filter-to-date').value || 'end';
+            const selectedDiv = document.getElementById('filter-division').value || 'All';
+            const fileName = `Digital_Txn_Report_3Pages_${selectedDiv}_${fromDate}_to_${toDate}.pdf`.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+
+            const opt = {
+                scale: 2,
+                useCORS: true,
+                letterRendering: true,
+                logging: false,
+                windowWidth: 1122
+            };
+
+            try {
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                const page1El = document.getElementById('pdf-page-1');
+                const page2El = document.getElementById('pdf-page-2');
+                const page3El = document.getElementById('pdf-page-3');
+
+                // PAGE 1
+                const canvas1 = await html2canvas(page1El, opt);
+                const imgData1 = canvas1.toDataURL('image/jpeg', 0.98);
+                pdf.addImage(imgData1, 'JPEG', 0, 0, 297, 210, undefined, 'FAST');
+
+                // PAGE 2
+                pdf.addPage('a4', 'landscape');
+                const canvas2 = await html2canvas(page2El, opt);
+                const imgData2 = canvas2.toDataURL('image/jpeg', 0.98);
+                pdf.addImage(imgData2, 'JPEG', 0, 0, 297, 210, undefined, 'FAST');
+
+                // PAGE 3
+                pdf.addPage('a4', 'landscape');
+                const canvas3 = await html2canvas(page3El, opt);
+                const imgData3 = canvas3.toDataURL('image/jpeg', 0.98);
+                pdf.addImage(imgData3, 'JPEG', 0, 0, 297, 210, undefined, 'FAST');
+
+                pdf.save(fileName);
+            } catch (err) {
+                console.error("PDF generation failed:", err);
+                window.print();
+            } finally {
+                // Restore original browser view
+                document.body.classList.remove('pdf-export-mode');
+                isSubDivExpanded = originalSubDivExpanded;
+                renderSubDivTable();
+                renderBottomRankings(lastFilteredRecords, false);
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        }
+
+        /* ---------------- INDEXEDDB LOCAL STORAGE ---------------- */
+        const DB_NAME = 'NagpurDigitalTxnMultiDateDB';
+        const DB_VERSION = 2;
+        const STORE_NAME = 'daily_reports';
+
+        function openIndexedDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'txn_date' });
+                    }
+                };
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function appendDayToIndexedDB(dateStr, fileName, records) {
+            try {
+                const db = await openIndexedDB();
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.put({
+                    txn_date: dateStr,
+                    fileName: fileName,
+                    records: records,
+                    uploadedAt: new Date().toISOString()
+                });
+                return new Promise((resolve, reject) => {
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = (e) => reject(e.target.error);
+                });
+            } catch (err) {
+                console.warn("IndexedDB append failed:", err);
+            }
+        }
+
+        async function loadFromLocalDatabase() {
+            try {
+                const db = await openIndexedDB();
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.getAll();
+
+                req.onsuccess = () => {
+                    const allDays = req.result || [];
+                    if (allDays.length === 0) {
+                        document.getElementById('upload-status-text').textContent = "Upload daily Booking CSVs to append and store in local database.";
+                        return;
+                    }
+
+                    allDays.sort((a, b) => a.txn_date.localeCompare(b.txn_date));
+
+                    rawParsedRecords = [];
+                    allDays.forEach(day => {
+                        day.records.forEach(r => {
+                            r.txn_date = day.txn_date;
+                            rawParsedRecords.push(r);
+                        });
+                    });
+
+                    const latestDate = allDays[allDays.length - 1].txn_date;
+                    const formattedLatestDate = formatDateIndian(latestDate);
+
+                    document.getElementById('filter-from-date').value = latestDate;
+                    document.getElementById('filter-to-date').value = latestDate;
+
+                    populateDropdownsFromData();
+
+                    document.getElementById('upload-status-text').innerHTML =
+                        `<span style="color: var(--success); font-weight: bold;"><i class="fas fa-check-circle"></i> Data updated upto ${formattedLatestDate}</span> <span style="font-size: 11px; opacity: 0.85;">(${allDays.length} day${allDays.length > 1 ? 's' : ''} stored)</span>`;
+
+                    applyFilters();
+                };
+            } catch (err) {
+                console.warn("Could not load from IndexedDB:", err);
+            }
+        }
+
+        async function clearLocalDatabase() {
+            if (confirm("Are you sure you want to clear all stored daily transaction reports from local storage?")) {
+                try {
+                    const db = await openIndexedDB();
+                    const tx = db.transaction(STORE_NAME, 'readwrite');
+                    tx.objectStore(STORE_NAME).clear();
+                } catch(e) {}
+                rawParsedRecords = [];
+                location.reload();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initDragAndDrop();
+            loadFromLocalDatabase();
+        });
+
+        function initDragAndDrop() {
+            const area = document.getElementById('drop-area');
+            ['dragenter', 'dragover'].forEach(eventName => {
+                area.addEventListener(eventName, e => {
+                    e.preventDefault();
+                    area.classList.add('dragover');
+                }, false);
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                area.addEventListener(eventName, e => {
+                    e.preventDefault();
+                    area.classList.remove('dragover');
+                }, false);
+            });
+            area.addEventListener('drop', e => {
+                const dt = e.dataTransfer;
+                if (dt && dt.files && dt.files.length > 0) {
+                    handleCSVFile(dt.files[0]);
+                }
+            }, false);
+        }
+
+        function populateDropdownsFromData() {
+            const divSet = new Set();
+            const subMap = {};
+            const typeSet = new Set();
+
+            rawParsedRecords.forEach(r => {
+                if (r.division && r.division !== 'Others / Unassigned') {
+                    divSet.add(r.division);
+                    if (!subMap[r.division]) subMap[r.division] = new Set();
+                    if (r.sub_division) subMap[r.division].add(r.sub_division);
+                }
+                if (r.office_type && r.office_type !== 'N/A') {
+                    typeSet.add(r.office_type);
+                }
+            });
+
+            globalDivisions = Array.from(divSet).sort();
+            globalSubDivMap = {};
+            for (let d in subMap) {
+                globalSubDivMap[d] = Array.from(subMap[d]).sort();
+            }
+            globalOfficeTypes = Array.from(typeSet).sort();
+
+            const divSelect = document.getElementById('filter-division');
+            divSelect.innerHTML = '<option value="ALL">All Divisions (Nagpur Region)</option>';
+            globalDivisions.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d;
+                opt.textContent = d;
+                divSelect.appendChild(opt);
+            });
+
+            const typeSelect = document.getElementById('filter-officetype');
+            typeSelect.innerHTML = '<option value="ALL">All Office Types</option>';
+            globalOfficeTypes.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                typeSelect.appendChild(opt);
+            });
+
+            onDivisionChange();
+        }
+
+        function onDivisionChange() {
+            const selectedDiv = document.getElementById('filter-division').value;
+            const subSelect = document.getElementById('filter-subdivision');
+            subSelect.innerHTML = '<option value="ALL">All Sub Divisions</option>';
+
+            let subs = [];
+            if (selectedDiv === 'ALL') {
+                const allSubs = new Set();
+                for (let d in globalSubDivMap) {
+                    globalSubDivMap[d].forEach(s => allSubs.add(s));
+                }
+                subs = Array.from(allSubs).sort();
+            } else if (globalSubDivMap[selectedDiv]) {
+                subs = globalSubDivMap[selectedDiv];
+            }
+
+            subs.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s;
+                subSelect.appendChild(opt);
+            });
+
+            applyFilters();
+        }
+
+        function formatDateIndian(dateVal) {
+            if (!dateVal) return '--';
+            const parts = dateVal.split('-');
+            return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : dateVal;
+        }
+
+        function parseCSV(text) {
+            const lines = text.split(/\r\n|\n/);
+            const result = [];
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const row = [];
+                let inQuotes = false;
+                let current = '';
+                for (let c = 0; c < line.length; c++) {
+                    const char = line[c];
+                    if (char === '"') inQuotes = !inQuotes;
+                    else if (char === ',' && !inQuotes) {
+                        row.push(current.trim().replace(/^"|"$/g, ''));
+                        current = '';
+                    } else current += char;
+                }
+                row.push(current.trim().replace(/^"|"$/g, ''));
+                result.push(row);
+            }
+            return result;
+        }
+
+        function detectTransactionDate(file) {
+            if (!file || !file.name) return '2026-09-12';
+            
+            const monthMap = { jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12' };
+            const textMatch = file.name.match(/(\d{1,2})[-_ ]([a-zA-Z]{3})[-_ ](\d{4})/i);
+            if (textMatch) {
+                const day = textMatch[1].padStart(2, '0');
+                const mStr = textMatch[2].toLowerCase();
+                const yr = textMatch[3];
+                if (monthMap[mStr]) return `${yr}-${monthMap[mStr]}-${day}`;
+            }
+
+            const nameMatch = file.name.match(/(\d{4}[\-_]\d{2}[\-_]\d{2})|(\d{2}[\._\-]\d{2}[\._\-]\d{4})/);
+            if (nameMatch) {
+                const matched = nameMatch[0];
+                if (/^\d{4}/.test(matched)) return matched.replace(/_/g, '-');
+                const parts = matched.split(/[\._\-]/);
+                return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+
+            if (file.lastModified) {
+                const d = new Date(file.lastModified);
+                if (!isNaN(d.getTime())) {
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${day}`;
+                }
+            }
+            return '2026-09-12';
+        }
+
+        function handleCSVFile(file) {
+            if (!file) return;
+            const statusEl = document.getElementById('upload-status-text');
+            statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Appending records to local database...';
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const csvRows = parseCSV(e.target.result);
+                    if (csvRows.length < 2) throw new Error("CSV file does not contain valid data rows.");
+
+                    const transDate = detectTransactionDate(file);
+                    
+                    document.getElementById('filter-from-date').value = transDate;
+                    document.getElementById('filter-to-date').value = transDate;
+
+                    const headers = csvRows[0].map(h => h.trim().replace(/^\uFEFF/, ''));
+                    
+                    const idxId = headers.findIndex(h => /^office\s*id$/i.test(h));
+                    const idxName = headers.findIndex(h => /^office\s*name$/i.test(h));
+                    const idxType = headers.findIndex(h => /office[-_ ]?type/i.test(h) || /type[-_ ]?code/i.test(h));
+                    const idxDiv = headers.findIndex(h => /^division$/i.test(h));
+                    const idxSubDiv = headers.findIndex(h => /^sub\s*division$/i.test(h) || /^sub-division$/i.test(h));
+
+                    const idxCashCnt = headers.indexOf('Cash (Cnt)');
+                    const idxDQR = headers.indexOf('DQR Scan (Cnt)');
+                    const idxSbiCard = headers.indexOf('SBIPOS-CARD (Cnt)');
+                    const idxSbiBharatQR = headers.indexOf('SBIPOS BHARATQR (Cnt)');
+                    const idxSbiEpayQR = headers.indexOf('SBIEPAY BHARATQR (Cnt)');
+                    const idxSbiEpayUPI = headers.indexOf('SBIEPAY UPI (Cnt)');
+                    const idxSbiEpayCredit = headers.indexOf('SBIEPAY Credit Card (Cnt)');
+                    const idxSbiEpayDebit = headers.indexOf('SBIEPAY Debit Card (Cnt)');
+
+                    const parsed = [];
+
+                    for (let i = 1; i < csvRows.length; i++) {
+                        const row = csvRows[i];
+                        if (!row || row.length <= 2) continue;
+
+                        const rawId = (row[idxId] || '').replace(/\.0$/, '').trim();
+                        const officeName = (row[idxName] || '').trim();
+                        if (!rawId || officeName.toLowerCase().includes('summary (all offices)')) continue;
+
+                        const divName = (idxDiv !== -1 && row[idxDiv]) ? row[idxDiv].trim() : 'Others / Unassigned';
+                        const subDivName = (idxSubDiv !== -1 && row[idxSubDiv]) ? row[idxSubDiv].trim() : 'Others / Unassigned';
+                        const officeType = (idxType !== -1 && row[idxType]) ? row[idxType].trim().toUpperCase() : 'N/A';
+
+                        const cash = safeNum(row[idxCashCnt]);
+                        const dqr = safeNum(row[idxDQR]);
+                        const sbiCard = safeNum(row[idxSbiCard]);
+                        const sbiBQR = safeNum(row[idxSbiBharatQR]);
+                        const sbiEpayBQR = safeNum(row[idxSbiEpayQR]);
+                        const sbiEpayUPI = safeNum(row[idxSbiEpayUPI]);
+                        const sbiEpayCredit = safeNum(row[idxSbiEpayCredit]);
+                        const sbiEpayDebit = safeNum(row[idxSbiEpayDebit]);
+
+                        const totalPos = sbiCard + sbiEpayCredit + sbiEpayDebit;
+                        const totalQr = dqr + sbiBQR + sbiEpayBQR + sbiEpayUPI;
+                        const totalDigital = totalPos + totalQr;
+                        const totalTxns = cash + totalDigital;
+                        const pct = totalTxns > 0 ? (totalDigital / totalTxns) * 100 : 0;
+
+                        parsed.push({
+                            office_id: rawId,
+                            office_name: officeName,
+                            office_type: officeType,
+                            division: divName,
+                            sub_division: subDivName,
+                            cash,
+                            pos: totalPos,
+                            qr: totalQr,
+                            total_digital: totalDigital,
+                            total_txns: totalTxns,
+                            pct
+                        });
+                    }
+
+                    await appendDayToIndexedDB(transDate, file.name, parsed);
+                    await loadFromLocalDatabase();
+
+                    const formattedDate = formatDateIndian(transDate);
+                    statusEl.innerHTML = `<span style="color: var(--success); font-weight: bold;"><i class="fas fa-check-circle"></i> Data updated upto ${formattedDate}</span> (${parsed.length} offices stored).`;
+
+                } catch (err) {
+                    alert("Error processing CSV: " + err.message);
+                    statusEl.textContent = "Error parsing file.";
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function applyFilters() {
+            const fromDate = document.getElementById('filter-from-date').value;
+            const toDate = document.getElementById('filter-to-date').value;
+            const selectedDiv = document.getElementById('filter-division').value;
+            const selectedSub = document.getElementById('filter-subdivision').value;
+            const selectedType = document.getElementById('filter-officetype').value;
+
+            let titleStr = 'Digital Transaction Report - Nagpur Region';
+            if (selectedDiv !== 'ALL') {
+                titleStr = `Digital Transaction Report - ${selectedDiv}`;
+            }
+            if (selectedType !== 'ALL') {
+                titleStr += ` (${selectedType})`;
+            }
+            document.getElementById('banner-title-text').textContent = titleStr;
+            document.getElementById('banner-date-range').textContent =
+                `Report Dated from ${formatDateIndian(fromDate)} to ${formatDateIndian(toDate)}`;
+
+            if (rawParsedRecords.length === 0) return;
+
+            const dateFiltered = rawParsedRecords.filter(r => {
+                if (fromDate && r.txn_date < fromDate) return false;
+                if (toDate && r.txn_date > toDate) return false;
+                if (selectedDiv !== 'ALL' && r.division !== selectedDiv) return false;
+                if (selectedSub !== 'ALL' && r.sub_division !== selectedSub) return false;
+                if (selectedType !== 'ALL' && r.office_type !== selectedType) return false;
+                return true;
+            });
+
+            const officeAggMap = {};
+            dateFiltered.forEach(r => {
+                const oid = r.office_id;
+                if (!officeAggMap[oid]) {
+                    officeAggMap[oid] = {
+                        office_id: r.office_id,
+                        office_name: r.office_name,
+                        office_type: r.office_type,
+                        division: r.division,
+                        sub_division: r.sub_division,
+                        cash: 0,
+                        pos: 0,
+                        qr: 0,
+                        total_digital: 0,
+                        total_txns: 0,
+                        pct: 0
+                    };
+                }
+                officeAggMap[oid].cash += r.cash;
+                officeAggMap[oid].pos += r.pos;
+                officeAggMap[oid].qr += r.qr;
+                officeAggMap[oid].total_digital += r.total_digital;
+                officeAggMap[oid].total_txns += r.total_txns;
+            });
+
+            const aggregatedRecords = Object.values(officeAggMap).map(o => {
+                o.pct = o.total_txns > 0 ? (o.total_digital / o.total_txns) * 100 : 0;
+                return o;
+            });
+
+            aggregatedActiveRecords = aggregatedRecords;
+            lastFilteredRecords = aggregatedRecords;
+            renderDashboard(aggregatedRecords, selectedDiv);
+        }
+
+        function renderDashboard(records, currentDiv) {
+            renderDivisionSummaryTable(records, currentDiv);
+
+            let totalCash = 0, totalDigital = 0;
+            records.forEach(r => {
+                totalCash += r.cash;
+                totalDigital += r.total_digital;
+            });
+
+            const grandTxns = totalCash + totalDigital;
+            const globalPct = grandTxns > 0 ? ((totalDigital / grandTxns) * 100).toFixed(2) : "0.00";
+
+            document.getElementById('s-offices').innerText = records.length.toLocaleString('en-IN');
+            document.getElementById('s-cash').innerText = Math.round(totalCash).toLocaleString('en-IN');
+            document.getElementById('s-digital').innerText = Math.round(totalDigital).toLocaleString('en-IN');
+            document.getElementById('s-pct').innerText = globalPct + '%';
+
+            const subDivMap = {};
+            records.forEach(r => {
+                const sName = r.sub_division || 'Others / Unassigned';
+                if (!subDivMap[sName]) subDivMap[sName] = { name: sName, count: 0, cash: 0, pos: 0, qr: 0, digital: 0 };
+                subDivMap[sName].count += 1;
+                subDivMap[sName].cash += r.cash;
+                subDivMap[sName].pos += r.pos;
+                subDivMap[sName].qr += r.qr;
+                subDivMap[sName].digital += r.total_digital;
+            });
+
+            lastSubDivList = Object.values(subDivMap).map(s => {
+                const total = s.cash + s.digital;
+                s.pct = total > 0 ? (s.digital / total) * 100 : 0;
+                return s;
+            }).sort((a, b) => b.pct - a.pct);
+
+            renderSubDivTable();
+            renderPendingMatrix(records);
+            renderBottomRankings(records, false);
+        }
+
+        /* ---------------- BOTTOM 3-COLUMN RANKINGS (NOW INCLUDES DIVISION NAME) ---------------- */
+        function renderBottomRankings(records, isPdfMode = false) {
+            const limit = isPdfMode ? 5 : 9999;
+
+            document.getElementById('rank-card-1-title').textContent = isPdfMode ? "100% Achieved Offices (Top 5)" : "100% Achieved Offices";
+            document.getElementById('rank-card-2-title').textContent = isPdfMode ? "Cash Only Offices (Top 5)" : "Cash Only Offices (0%)";
+            document.getElementById('rank-card-3-title').textContent = isPdfMode ? "Bottom 5 Partial Digital Adoption" : "Partial Digital Adoption";
+
+            // 1. 100% Achieved
+            const achieved = records.filter(r => r.pct === 100 && r.total_txns > 0).sort((a,b) => b.total_digital - a.total_digital).slice(0, limit);
+            document.getElementById('performance-list').innerHTML = achieved.length === 0 ?
+                `<li style="padding: 15px; text-align: center; color: var(--text-tertiary);">No 100% digital offices recorded.</li>` :
+                achieved.map((r, i) => `
+                    <li class="performance-item" style="border-left-color: var(--success);" onclick="openOfficeDetailModal('${escapeHtml(r.office_id)}')">
+                        <div style="display: flex; align-items: center; overflow: hidden; flex: 1; min-width: 0; margin-right: 8px;">
+                            <div class="performance-rank" style="background: var(--success);">${i+1}</div>
+                            <div class="performance-info">
+                                <div class="performance-name-row">
+                                    <span class="performance-office-name">${escapeHtml(r.office_name)}</span>
+                                    <span class="type-tag type-${escapeHtml(r.office_type)}">${escapeHtml(r.office_type)}</span>
+                                </div>
+                                <div class="performance-sub-row">
+                                    <span class="division-tag"><i class="fas fa-sitemap"></i>${escapeHtml(r.division)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="performance-badge" style="background: var(--success-light); color: var(--success);">100%</div>
+                    </li>
+                `).join('');
+
+            // 2. Cash Only
+            const cashOnly = records.filter(r => r.pct === 0 && r.cash > 0).sort((a,b) => b.cash - a.cash).slice(0, limit);
+            document.getElementById('nil-performance-list').innerHTML = cashOnly.length === 0 ?
+                `<li style="padding: 15px; text-align: center; color: var(--text-tertiary);">No cash-only offices!</li>` :
+                cashOnly.map((r, i) => `
+                    <li class="performance-item" style="border-left-color: var(--danger);" onclick="openOfficeDetailModal('${escapeHtml(r.office_id)}')">
+                        <div style="display: flex; align-items: center; overflow: hidden; flex: 1; min-width: 0; margin-right: 8px;">
+                            <div class="performance-rank" style="background: var(--danger);">${i+1}</div>
+                            <div class="performance-info">
+                                <div class="performance-name-row">
+                                    <span class="performance-office-name">${escapeHtml(r.office_name)}</span>
+                                    <span class="type-tag type-${escapeHtml(r.office_type)}">${escapeHtml(r.office_type)}</span>
+                                </div>
+                                <div class="performance-sub-row">
+                                    <span class="division-tag"><i class="fas fa-sitemap"></i>${escapeHtml(r.division)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="performance-badge" style="background: var(--danger-light); color: var(--danger);">${Math.round(r.cash).toLocaleString('en-IN')}</div>
+                    </li>
+                `).join('');
+
+            // 3. Bottom 5 Adoption
+            const partial = records.filter(r => r.pct > 0 && r.pct < 100).sort((a,b) => a.pct - b.pct).slice(0, limit);
+            document.getElementById('bottom-performance-list').innerHTML = partial.length === 0 ?
+                `<li style="padding: 15px; text-align: center; color: var(--text-tertiary);">All offices are 100% or cash-only.</li>` :
+                partial.map((r, i) => `
+                    <li class="performance-item" style="border-left-color: var(--warning);" onclick="openOfficeDetailModal('${escapeHtml(r.office_id)}')">
+                        <div style="display: flex; align-items: center; overflow: hidden; flex: 1; min-width: 0; margin-right: 8px;">
+                            <div class="performance-rank" style="background: var(--warning);">${i+1}</div>
+                            <div class="performance-info">
+                                <div class="performance-name-row">
+                                    <span class="performance-office-name">${escapeHtml(r.office_name)}</span>
+                                    <span class="type-tag type-${escapeHtml(r.office_type)}">${escapeHtml(r.office_type)}</span>
+                                </div>
+                                <div class="performance-sub-row">
+                                    <span class="division-tag"><i class="fas fa-sitemap"></i>${escapeHtml(r.division)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="performance-badge" style="background: var(--warning-light); color: var(--warning);">${r.pct.toFixed(2)}%</div>
+                    </li>
+                `).join('');
+        }
+
+        /* ---------------- SINGLE OFFICE DETAIL POPUP ---------------- */
+        function openOfficeDetailModal(officeId) {
+            const office = aggregatedActiveRecords.find(o => String(o.office_id) === String(officeId));
+            if (!office) return;
+
+            activeOfficeDetail = office;
+
+            document.getElementById('od-title').textContent = office.office_name;
+            document.getElementById('od-subtitle').textContent = `Office ID: ${office.office_id}`;
+            document.getElementById('od-div').textContent = office.division;
+            document.getElementById('od-sub').textContent = office.sub_division;
+            document.getElementById('od-type').innerHTML = `<span class="type-tag type-${escapeHtml(office.office_type)}">${escapeHtml(office.office_type)}</span>`;
+            
+            const pctColor = office.pct >= 75 ? 'var(--success)' : (office.pct >= 40 ? 'var(--warning)' : 'var(--danger)');
+            document.getElementById('od-pct').innerHTML = `<span style="color: ${pctColor};">${office.pct.toFixed(2)}%</span>`;
+
+            document.getElementById('od-cash').textContent = Math.round(office.cash).toLocaleString('en-IN');
+            document.getElementById('od-pos').textContent = Math.round(office.pos).toLocaleString('en-IN');
+            document.getElementById('od-qr').textContent = Math.round(office.qr).toLocaleString('en-IN');
+            document.getElementById('od-digital').textContent = Math.round(office.total_digital).toLocaleString('en-IN');
+            document.getElementById('od-total').textContent = Math.round(office.total_txns).toLocaleString('en-IN');
+
+            document.getElementById('office-detail-modal').style.display = 'flex';
+        }
+
+        function closeOfficeModal() {
+            document.getElementById('office-detail-modal').style.display = 'none';
+        }
+
+        function exportSingleOfficeExcel() {
+            if (!activeOfficeDetail) return;
+            const o = activeOfficeDetail;
+            const data = [{
+                "Office ID": o.office_id,
+                "Office Name": o.office_name,
+                "Office Type": o.office_type,
+                "Division": o.division,
+                "Sub Division": o.sub_division,
+                "Cash (Cnt)": Math.round(o.cash),
+                "SBI POS (Cnt)": Math.round(o.pos),
+                "QR / UPI (Cnt)": Math.round(o.qr),
+                "Total Digital": Math.round(o.total_digital),
+                "Total Transactions": Math.round(o.total_txns),
+                "Digital %": `${o.pct.toFixed(2)}%`
+            }];
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Office Detail");
+            XLSX.writeFile(wb, `${o.office_name.replace(/[^a-zA-Z0-9]/g, '_')}_Detail.xlsx`);
+        }
+
+        /* ---------------- SUB-DIVISION BREAKDOWN TABLE ---------------- */
+        function toggleSubDivExpand() {
+            isSubDivExpanded = !isSubDivExpanded;
+            const btn = document.getElementById('subdiv-toggle-btn');
+            btn.innerHTML = isSubDivExpanded
+                ? '<i class="fas fa-compress-alt"></i> Show Top 5 Only'
+                : '<i class="fas fa-expand-alt"></i> Show All Sub-Divisions';
+            renderSubDivTable();
+        }
+
+        function renderSubDivTable() {
+            const list = lastSubDivList;
+            const displayList = isSubDivExpanded ? list : list.slice(0, 5);
+
+            document.getElementById('subdiv-count-badge').textContent = isSubDivExpanded
+                ? `Showing all ${list.length} Sub-Divisions`
+                : `Showing Top 5 of ${list.length} Sub-Divisions`;
+
+            let totalOffices = 0, totalCash = 0, totalPos = 0, totalQr = 0, totalDigital = 0;
+            list.forEach(s => {
+                totalOffices += s.count;
+                totalCash += s.cash;
+                totalPos += s.pos;
+                totalQr += s.qr;
+                totalDigital += s.digital;
+            });
+            const globalPct = (totalCash + totalDigital) > 0 ? ((totalDigital / (totalCash + totalDigital)) * 100).toFixed(2) : "0.00";
+
+            document.getElementById('subdivision-table').innerHTML = displayList.map((s, i) => `
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 10px 14px;">${i+1}</td>
+                    <td style="padding: 10px 14px; font-weight: 700;">${escapeHtml(s.name)}</td>
+                    <td style="padding: 10px 14px; text-align: center;">${s.count}</td>
+                    <td style="padding: 10px 14px; text-align: right;">${Math.round(s.cash).toLocaleString('en-IN')}</td>
+                    <td style="padding: 10px 14px; text-align: right;">${Math.round(s.pos).toLocaleString('en-IN')}</td>
+                    <td style="padding: 10px 14px; text-align: right;">${Math.round(s.qr).toLocaleString('en-IN')}</td>
+                    <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: var(--primary);">${Math.round(s.digital).toLocaleString('en-IN')}</td>
+                    <td style="padding: 10px 14px; text-align: center;">
+                        <span class="performance-badge" style="${s.pct >= 75 ? 'background: var(--success-light); color: var(--success);' : (s.pct >= 40 ? 'background: var(--warning-light); color: var(--warning);' : 'background: var(--danger-light); color: var(--danger);')}">
+                            ${s.pct.toFixed(2)}%
+                        </span>
+                    </td>
+                </tr>
+            `).join('') + `
+                <tr style="font-weight: 800; background: var(--bg-surface-2); border-top: 2px solid var(--border);">
+                    <td style="padding: 10px 14px;">-</td>
+                    <td style="padding: 10px 14px;">TOTAL (${list.length} SUB-DIVISIONS)</td>
+                    <td style="padding: 10px 14px; text-align: center;">${totalOffices}</td>
+                    <td style="padding: 10px 14px; text-align: right;">${Math.round(totalCash).toLocaleString('en-IN')}</td>
+                    <td style="padding: 10px 14px; text-align: right;">${Math.round(totalPos).toLocaleString('en-IN')}</td>
+                    <td style="padding: 10px 14px; text-align: right;">${Math.round(totalQr).toLocaleString('en-IN')}</td>
+                    <td style="padding: 10px 14px; text-align: right; color: var(--primary);">${Math.round(totalDigital).toLocaleString('en-IN')}</td>
+                    <td style="padding: 10px 14px; text-align: center;">
+                        <span class="performance-badge" style="background: var(--success); color: #fff;">${globalPct}%</span>
+                    </td>
+                </tr>
+            `;
+        }
+
+        /* ---------------- DIVISION SUMMARY TABLE ---------------- */
+        function renderDivisionSummaryTable(records, currentDiv) {
+            const tbody = document.getElementById('division-summary-tbody');
+            const groupKey = (currentDiv === 'ALL') ? 'division' : 'sub_division';
+            const groupMap = {};
+
+            records.forEach(r => {
+                const key = r[groupKey] || 'Others / Unassigned';
+                if (!groupMap[key]) groupMap[key] = { name: key, total_txns: 0, cash: 0, digital: 0 };
+                groupMap[key].total_txns += r.total_txns;
+                groupMap[key].cash += r.cash;
+                groupMap[key].digital += r.total_digital;
+            });
+
+            const rows = Object.values(groupMap).map(g => {
+                g.pct = g.total_txns > 0 ? (g.digital / g.total_txns) * 100 : 0;
+                return g;
+            }).sort((a, b) => b.pct - a.pct);
+
+            lastSummaryRows = rows;
+
+            let grandTotalTxns = 0, grandCash = 0, grandDigital = 0;
+            rows.forEach(r => {
+                grandTotalTxns += r.total_txns;
+                grandCash += r.cash;
+                grandDigital += r.digital;
+            });
+            const grandPct = grandTotalTxns > 0 ? (grandDigital / grandTotalTxns) * 100 : 0;
+
+            tbody.innerHTML = rows.map(r => {
+                let arrowClass = 'trend-down';
+                let iconClass = 'fa-arrow-down';
+                if (r.pct >= 75) { arrowClass = 'trend-up'; iconClass = 'fa-arrow-up'; }
+                else if (r.pct >= 40) { arrowClass = 'trend-mid'; iconClass = 'fa-arrow-right'; }
+
+                return `
+                    <tr>
+                        <td style="text-align: left; font-weight: 700; font-style: italic;">${escapeHtml(r.name)}</td>
+                        <td>${Math.round(r.total_txns).toLocaleString('en-IN')}</td>
+                        <td>${Math.round(r.cash).toLocaleString('en-IN')}</td>
+                        <td>${Math.round(r.digital).toLocaleString('en-IN')}</td>
+                        <td style="font-weight: 800; text-align: right; padding-right: 25px;">
+                            <span class="trend-icon ${arrowClass}"><i class="fas ${iconClass}"></i></span>
+                            <span>${r.pct.toFixed(2)}%</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('') + `
+                <tr class="total-row">
+                    <td style="text-align: center; font-style: italic;">Total</td>
+                    <td>${Math.round(grandTotalTxns).toLocaleString('en-IN')}</td>
+                    <td>${Math.round(grandCash).toLocaleString('en-IN')}</td>
+                    <td>${Math.round(grandDigital).toLocaleString('en-IN')}</td>
+                    <td style="text-align: right; padding-right: 25px;">${grandPct.toFixed(2)}%</td>
+                </tr>
+            `;
+        }
+
+        /* ---------------- COPY BANNER SECTION TO IMAGE ---------------- */
+        async function copyBannerReportImage() {
+            const card = document.getElementById('capture-summary-card');
+            const btnText = document.getElementById('copy-img-btn-text');
+            btnText.textContent = "Capturing...";
+
+            try {
+                const canvas = await html2canvas(card, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-surface') || '#ffffff'
+                });
+
+                canvas.toBlob(async (blob) => {
+                    let copied = false;
+                    if (navigator.clipboard && window.ClipboardItem) {
+                        try {
+                            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                            copied = true;
+                        } catch (e) {}
+                    }
+
+                    if (copied) {
+                        btnText.textContent = "Copied to Clipboard!";
+                        setTimeout(() => btnText.textContent = "Copy to Image", 2500);
+                    } else {
+                        const link = document.createElement('a');
+                        link.download = 'Digital_Transaction_Report_Summary.png';
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                        btnText.textContent = "Downloaded Image!";
+                        setTimeout(() => btnText.textContent = "Copy to Image", 2500);
+                    }
+                });
+            } catch (err) {
+                alert("Failed to create report image: " + err.message);
+                btnText.textContent = "Copy to Image";
+            }
+        }
+
+        /* ---------------- OFFICES PENDING 75% MATRIX ---------------- */
+        let matrixDivisionMap = {};
+
+        function renderPendingMatrix(records) {
+            matrixDivisionMap = {};
+            let totalShortfalls = 0;
+
+            function getGroupKey(type) {
+                const t = (type || '').toUpperCase();
+                if (t === 'HPO' || t === 'GPO') return 'HPO_GPO';
+                if (t === 'RMS') return 'RMS';
+                if (t === 'SPO') return 'SPO';
+                if (t === 'BPO') return 'BPO';
+                return 'SPO';
+            }
+
+            records.forEach(r => {
+                const div = r.division || 'Others / Unassigned';
+                if (!matrixDivisionMap[div]) {
+                    matrixDivisionMap[div] = {
+                        name: div,
+                        HPO_GPO: { total: [], shortfall: [] },
+                        RMS: { total: [], shortfall: [] },
+                        SPO: { total: [], shortfall: [] },
+                        BPO: { total: [], shortfall: [] }
+                    };
+                }
+
+                const grp = getGroupKey(r.office_type);
+                matrixDivisionMap[div][grp].total.push(r);
+                if (r.pct < 75) {
+                    matrixDivisionMap[div][grp].shortfall.push(r);
+                    totalShortfalls++;
+                }
+            });
+
+            document.getElementById('pending75-badge').textContent = `${totalShortfalls} Shortfall Offices`;
+
+            const divList = Object.values(matrixDivisionMap).sort((a, b) => a.name.localeCompare(b.name));
+
+            let totHpoOffices = 0, totHpoShort = 0;
+            let totRmsOffices = 0, totRmsShort = 0;
+            let totSpoOffices = 0, totSpoShort = 0;
+            let totBpoOffices = 0, totBpoShort = 0;
+
+            const tbody = document.getElementById('pending-matrix-tbody');
+            if (divList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 25px; color: var(--text-tertiary);">No records loaded.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = divList.map(d => {
+                const hpoOff = d.HPO_GPO.total.length;
+                const hpoShort = d.HPO_GPO.shortfall.length;
+                const rmsOff = d.RMS.total.length;
+                const rmsShort = d.RMS.shortfall.length;
+                const spoOff = d.SPO.total.length;
+                const spoShort = d.SPO.shortfall.length;
+                const bpoOff = d.BPO.total.length;
+                const bpoShort = d.BPO.shortfall.length;
+
+                totHpoOffices += hpoOff; totHpoShort += hpoShort;
+                totRmsOffices += rmsOff; totRmsShort += rmsShort;
+                totSpoOffices += spoOff; totSpoShort += spoShort;
+                totBpoOffices += bpoOff; totBpoShort += bpoShort;
+
+                return `
+                    <tr>
+                        <td style="text-align: left; font-weight: 700;">${escapeHtml(d.name)}</td>
+                        <td>${hpoOff || '-'}</td>
+                        <td>${renderShortfallCell(d.name, 'HPO / GPO', hpoShort, 'HPO_GPO')}</td>
+                        <td>${rmsOff || '-'}</td>
+                        <td>${renderShortfallCell(d.name, 'RMS', rmsShort, 'RMS')}</td>
+                        <td>${spoOff || '-'}</td>
+                        <td>${renderShortfallCell(d.name, 'SPO', spoShort, 'SPO')}</td>
+                        <td>${bpoOff || '-'}</td>
+                        <td>${renderShortfallCell(d.name, 'BPO', bpoShort, 'BPO')}</td>
+                    </tr>
+                `;
+            }).join('') + `
+                <tr class="total-tr">
+                    <td style="text-align: left;">Total</td>
+                    <td>${totHpoOffices}</td>
+                    <td>${totHpoShort > 0 ? `<span class="shortfall-link" onclick="openShortfallModal('All Divisions', 'HPO / GPO', 'HPO_GPO')">${totHpoShort}</span>` : '<span class="shortfall-zero">0</span>'}</td>
+                    <td>${totRmsOffices}</td>
+                    <td>${totRmsShort > 0 ? `<span class="shortfall-link" onclick="openShortfallModal('All Divisions', 'RMS', 'RMS')">${totRmsShort}</span>` : '<span class="shortfall-zero">0</span>'}</td>
+                    <td>${totSpoOffices}</td>
+                    <td>${totSpoShort > 0 ? `<span class="shortfall-link" onclick="openShortfallModal('All Divisions', 'SPO', 'SPO')">${totSpoShort}</span>` : '<span class="shortfall-zero">0</span>'}</td>
+                    <td>${totBpoOffices}</td>
+                    <td>${totBpoShort > 0 ? `<span class="shortfall-link" onclick="openShortfallModal('All Divisions', 'BPO', 'BPO')">${totBpoShort}</span>` : '<span class="shortfall-zero">0</span>'}</td>
+                </tr>
+            `;
+        }
+
+        function renderShortfallCell(divName, label, count, groupKey) {
+            if (count > 0) {
+                return `<span class="shortfall-link" onclick="openShortfallModal('${escapeHtml(divName)}', '${label}', '${groupKey}')">${count}</span>`;
+            }
+            return `<span class="shortfall-zero">0</span>`;
+        }
+
+        /* ---------------- SHORTFALL DRILLDOWN MODAL ---------------- */
+        function openShortfallModal(divName, label, groupKey) {
+            let offices = [];
+
+            if (divName === 'All Divisions') {
+                for (let d in matrixDivisionMap) {
+                    offices.push(...matrixDivisionMap[d][groupKey].shortfall);
+                }
+            } else if (matrixDivisionMap[divName]) {
+                offices = matrixDivisionMap[divName][groupKey].shortfall;
+            }
+
+            modalActiveOffices = offices.sort((a, b) => a.pct - b.pct);
+            modalActiveTitle = `${divName} - ${label} Shortfall (< 75%)`;
+
+            document.getElementById('modal-title').textContent = modalActiveTitle;
+            document.getElementById('modal-subtitle').textContent = `Total Shortfall Offices: ${offices.length}`;
+
+            const tbody = document.getElementById('modal-tbody');
+            tbody.innerHTML = offices.map((o, i) => `
+                <tr style="border-bottom: 1px solid var(--border); cursor: pointer;" onclick="openOfficeDetailModal('${escapeHtml(o.office_id)}')">
+                    <td style="padding: 7px 8px;">${i+1}</td>
+                    <td style="padding: 7px 8px; font-weight: 600; color: var(--primary);">${escapeHtml(o.office_name)}</td>
+                    <td style="padding: 7px 8px;">${escapeHtml(o.sub_division)}</td>
+                    <td style="padding: 7px 8px; text-align: center;"><span class="type-tag type-${escapeHtml(o.office_type)}">${escapeHtml(o.office_type)}</span></td>
+                    <td style="padding: 7px 8px; text-align: right;">${Math.round(o.cash).toLocaleString('en-IN')}</td>
+                    <td style="padding: 7px 8px; text-align: right; color: var(--primary); font-weight: 700;">${Math.round(o.total_digital).toLocaleString('en-IN')}</td>
+                    <td style="padding: 7px 8px; text-align: right;">${Math.round(o.total_txns).toLocaleString('en-IN')}</td>
+                    <td style="padding: 7px 8px; text-align: center;">
+                        <span class="performance-badge" style="${o.pct === 0 ? 'background: var(--danger-light); color: var(--danger);' : 'background: var(--warning-light); color: var(--warning);'}">
+                            ${o.pct.toFixed(2)}%
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('shortfall-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('shortfall-modal').style.display = 'none';
+        }
+
+        function exportModalListExcel() {
+            if (!modalActiveOffices || modalActiveOffices.length === 0) {
+                alert("No shortfall offices to export.");
+                return;
+            }
+
+            const data = modalActiveOffices.map((r, i) => ({
+                "SL": i + 1,
+                "Office ID": r.office_id,
+                "Office Name": r.office_name,
+                "Office Type": r.office_type,
+                "Division": r.division,
+                "Sub Division": r.sub_division,
+                "Cash (Cnt)": Math.round(r.cash),
+                "SBI POS (Cnt)": Math.round(r.pos),
+                "QR / UPI (Cnt)": Math.round(r.qr),
+                "Total Digital": Math.round(r.total_digital),
+                "Total Transactions": Math.round(r.total_txns),
+                "Digital %": `${r.pct.toFixed(2)}%`
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Shortfall Offices");
+            const cleanFileName = (modalActiveTitle.replace(/[^a-zA-Z0-9]/g, '_') || "Shortfall_Offices") + ".xlsx";
+            XLSX.writeFile(wb, cleanFileName);
+        }
+
+        /* ---------------- EXCEL EXPORTS ---------------- */
+        function exportDivisionSummaryExcel() {
+            if (!lastSummaryRows || lastSummaryRows.length === 0) {
+                alert("No summary data available to export.");
+                return;
+            }
+            const data = lastSummaryRows.map(r => ({
+                "Office / Unit Name": r.name,
+                "Total Transactions": Math.round(r.total_txns),
+                "Cash (Cnt)": Math.round(r.cash),
+                "Digital Transactions": Math.round(r.digital),
+                "Percentage %": `${r.pct.toFixed(2)}%`
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Division Summary");
+            XLSX.writeFile(wb, "Digital_Transaction_Summary_Report.xlsx");
+        }
+
+        function exportSubdivisionExcel() {
+            if (!lastSubDivList || lastSubDivList.length === 0) {
+                alert("No sub-division data available to export.");
+                return;
+            }
+            const data = lastSubDivList.map((s, i) => ({
+                "SL": i + 1,
+                "Sub Division": s.name,
+                "Active Offices": s.count,
+                "Cash (Cnt)": Math.round(s.cash),
+                "SBI POS (Cnt)": Math.round(s.pos),
+                "QR / UPI (Cnt)": Math.round(s.qr),
+                "Total Digital": Math.round(s.digital),
+                "Digital %": `${s.pct.toFixed(2)}%`
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Sub Division Consolidation");
+            XLSX.writeFile(wb, "Sub_Division_Consolidated_Report.xlsx");
+        }
+
+        function exportListExcel(type) {
+            let records = [];
+            let fileName = "Office_Performance_Report.xlsx";
+            let sheetName = "Performance";
+
+            if (type === 'achieved') {
+                records = lastFilteredRecords.filter(r => r.pct === 100 && r.total_txns > 0);
+                fileName = "100_Percent_Achieved_Offices.xlsx";
+                sheetName = "100% Digital Offices";
+            } else if (type === 'cashonly') {
+                records = lastFilteredRecords.filter(r => r.pct === 0 && r.cash > 0);
+                fileName = "Cash_Only_Offices.xlsx";
+                sheetName = "Cash Only Offices";
+            } else if (type === 'partial') {
+                records = lastFilteredRecords.filter(r => r.pct > 0 && r.pct < 100);
+                fileName = "Partial_Digital_Offices.xlsx";
+                sheetName = "Partial Digital Offices";
+            }
+
+            if (records.length === 0) {
+                alert("No records found to export.");
+                return;
+            }
+
+            const data = records.map((r, i) => ({
+                "SL": i + 1,
+                "Office ID": r.office_id,
+                "Office Name": r.office_name,
+                "Office Type": r.office_type,
+                "Division": r.division,
+                "Sub Division": r.sub_division,
+                "Cash (Cnt)": Math.round(r.cash),
+                "SBI POS (Cnt)": Math.round(r.pos),
+                "QR / UPI (Cnt)": Math.round(r.qr),
+                "Total Digital": Math.round(r.total_digital),
+                "Total Transactions": Math.round(r.total_txns),
+                "Digital %": `${r.pct.toFixed(2)}%`
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            XLSX.writeFile(wb, fileName);
+        }
+
+        function exportPendingMatrixExcel() {
+            const divList = Object.values(matrixDivisionMap).sort((a, b) => a.name.localeCompare(b.name));
+            if (divList.length === 0) {
+                alert("No matrix data to export.");
+                return;
+            }
+
+            const data = divList.map(d => ({
+                "Division Name": d.name,
+                "HPO/GPO Total": d.HPO_GPO.total.length,
+                "HPO/GPO Shortfall": d.HPO_GPO.shortfall.length,
+                "RMS Total": d.RMS.total.length,
+                "RMS Shortfall": d.RMS.shortfall.length,
+                "SPO Total": d.SPO.total.length,
+                "SPO Shortfall": d.SPO.shortfall.length,
+                "BPO Total": d.BPO.total.length,
+                "BPO Shortfall": d.BPO.shortfall.length
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Shortfall Matrix");
+            XLSX.writeFile(wb, "Pending_75_Adoption_Office_Type_Matrix.xlsx");
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            document.documentElement.setAttribute('data-theme', currentTheme === 'light' ? 'dark' : 'light');
+            applyFilters();
+        }
+    </script>
 </body>
 </html>
