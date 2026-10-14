@@ -128,10 +128,12 @@ function upsertRecords_(records) {
     ];
     const key = date + '|' + officeId;
     const rowNo = rowByKey.get(key);
-    if (rowNo) updateRows.push({rowNo:rowNo, values:row});
+    if (rowNo && rowNo <= sheet.getLastRow()) updateRows.push({rowNo:rowNo, values:row});
+    else if (rowNo) appendRows[rowNo - sheet.getLastRow() - 1] = row;
     else {
+      const newRowNo = sheet.getLastRow() + appendRows.length + 1;
       appendRows.push(row);
-      rowByKey.set(key, -1);
+      rowByKey.set(key, newRowNo);
     }
   });
 
