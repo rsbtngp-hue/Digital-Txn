@@ -1173,7 +1173,7 @@
         // Admin Auth State
         let isAdminLoggedIn = false;
 
-        const GSHEET_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzzOcJEjzsLdWgtdHq67Zd4nKZJbIMQk9PAwEOTcK4k1Swam7YKOY1lf3Gn4BVu_4kukg/exec";
+        const GSHEET_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzT3bdH8HHE2CDjPMGXgsroRHpbycw03FHjsuBUqQsPHAq4tYik7PM4WMZrDSQSZytmqA/exec";
 
         // Admin Toggle
         function toggleAdminLogin() {
@@ -1416,42 +1416,197 @@
         async function loadFromLocalDatabase() {
             try {
                 const db = await openIndexedDB();
-                const tx = db.transaction(STORE_NAME, 'readonly');
-                const store = tx.objectStore(STORE_NAME);
-                const req = store.getAll();
+                const allDays = await new Promise((resolve, reject) => {
+                    const tx = db.transaction(STORE_NAME, 'readonly');
+                    const req = tx.objectStore(STORE_NAME).getAll();
+                    req.onsuccess = () => resolve(req.result || []);
+                    req.onerror = () => reject(req.error || new Error('Could not read local database'));
+                });
+                db.close();
 
-                req.onsuccess = () => {
-                    const allDays = req.result || [];
-                    if (allDays.length === 0) {
-                        document.getElementById('upload-status-text').textContent = "Upload Booking CSV to extract dates and append to local database.";
+                allDays.sort((a, b) => a.txn_date.localeCompare(b.txn_date));
+                rawParsedRecords = [];
+
+                if (allDays.length === 0) {
+                    populateDropdownsFromData();
+                    document.getElementById('upload-status-text').textContent =
+                        'No local records yet. Checking Google Sheets…';
+                    applyFilters();
+                    return [];
+                }
+
+                allDays.forEach(day => {
+                    (day.records || []).forEach(record => {
+                        rawParsedRecords.push({ ...record, txn_date: day.txn_date });
+                    });
+                });
+
+                const latestDate = allDays[allDays.length - 1].txn_date;
+                document.getElementById('filter-from-date').value = allDays[0].txn_date;
+                document.getElementById('filter-to-date').value = latestDate;
+                populateDropdownsFromData();
+
+                document.getElementById('upload-status-text').innerHTML =
+                    `<span style="color: var(--success); font-weight: bold;"><i class="fas fa-database"></i> Local data ready through ${formatDateIndian(latestDate)}</span> <span style="font-size:11px;opacity:.85;">(${allDays.length} day${allDays.length !== 1 ? 's' : ''} stored · Google sync pending)</span>`;
+                applyFilters();
+                return allDays;
+            } catch (err) {
+                console.warn('Could not load from IndexedDB:', err);
+                document.getElementById('upload-status-text').textContent =
+                    'Local database could not be read. Checking Google Sheets…';
+                return [];
+            }
+        }
+
+        function fetchGoogleRecordsJSONP() {
+            return new Promise((resolve, reject) => {
+                const callbackName = '__digitalTxnGoogleRecordsCallback';
+                const script = document.createElement('script');
+                let finished = false;
+                const cleanup = () => {
+                    if (finished) return;
+                    finished = true;
+                    clearTimeout(timeoutId);
+                    script.remove();
+                    try { delete window[callbackName]; } catch (e) { window[callbackName] = undefined; }
+                };
+                const timeoutId = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('Google Sheets request timed out'));
+                }, 45000);
+
+                window[callbackName] = payload => {
+                    cleanup();
+                    if (!payload || payload.ok !== true || !Array.isArray(payload.records)) {
+                        reject(new Error((payload && payload.error) || 'Google Sheets returned an unexpected response'));
                         return;
                     }
-
-                    allDays.sort((a, b) => a.txn_date.localeCompare(b.txn_date));
-
-                    rawParsedRecords = [];
-                    allDays.forEach(day => {
-                        day.records.forEach(r => {
-                            r.txn_date = day.txn_date;
-                            rawParsedRecords.push(r);
-                        });
-                    });
-
-                    const latestDate = allDays[allDays.length - 1].txn_date;
-                    const formattedLatestDate = formatDateIndian(latestDate);
-
-                    document.getElementById('filter-from-date').value = allDays[0].txn_date;
-                    document.getElementById('filter-to-date').value = latestDate;
-
-                    populateDropdownsFromData();
-
-                    document.getElementById('upload-status-text').innerHTML =
-                        `<span style="color: var(--success); font-weight: bold;"><i class="fas fa-check-circle"></i> Data updated upto ${formattedLatestDate}</span> <span style="font-size: 11px; opacity: 0.85;">(${allDays.length} day${allDays.length > 1 ? 's' : ''} stored)</span>`;
-
-                    applyFilters();
+                    resolve(payload);
                 };
+                script.onerror = () => {
+                    cleanup();
+                    reject(new Error('Could not load the Google Sheets web app. Check its deployment access.'));
+                };
+                const separator = GSHEET_WEB_APP_URL.includes('?') ? '&' : '?';
+                script.src = GSHEET_WEB_APP_URL + separator +
+                    'action=getRecords&callback=' + encodeURIComponent(callbackName) +
+                    '&_=' + Date.now();
+                document.head.appendChild(script);
+            });
+        }
+
+        function normalizeGoogleTxnDate(value) {
+            const raw = String(value == null ? '' : value).trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+            const isoPrefix = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+            if (isoPrefix) return isoPrefix[1];
+            const dmy = raw.match(/^(\d{1,2})[/. -](\d{1,2})[/. -](\d{4})$/);
+            if (dmy) return dmy[3] + '-' + String(dmy[2]).padStart(2, '0') + '-' + String(dmy[1]).padStart(2, '0');
+            return '';
+        }
+
+        async function mergeGoogleRecordsIntoLocalDatabase(remoteRecords) {
+            const db = await openIndexedDB();
+            const existingDays = await new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const req = tx.objectStore(STORE_NAME).getAll();
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = () => reject(req.error || new Error('Could not read local records before merging'));
+            });
+            db.close();
+
+            const days = new Map();
+            existingDays.forEach(day => {
+                const date = normalizeGoogleTxnDate(day.txn_date);
+                if (!date) return;
+                const recordMap = new Map();
+                (day.records || []).forEach(record => {
+                    const id = String(record.office_id == null ? '' : record.office_id).trim();
+                    if (id) recordMap.set(id, { ...record, txn_date: date, office_id: id });
+                });
+                days.set(date, {
+                    txn_date: date,
+                    fileName: day.fileName || 'Local database',
+                    uploadedAt: day.uploadedAt || '',
+                    recordMap,
+                    changed: false
+                });
+            });
+
+            let accepted = 0;
+            let skipped = 0;
+            remoteRecords.forEach(row => {
+                const date = normalizeGoogleTxnDate(row.txn_date || row['txn-date'] || row.date);
+                const officeId = String(row.office_id == null ? (row['office-id'] || '') : row.office_id).trim();
+                if (!date || !officeId) { skipped++; return; }
+
+                if (!days.has(date)) {
+                    days.set(date, {
+                        txn_date: date,
+                        fileName: 'Google Sheets sync',
+                        uploadedAt: new Date().toISOString(),
+                        recordMap: new Map(),
+                        changed: true
+                    });
+                }
+                const day = days.get(date);
+                day.recordMap.set(officeId, {
+                    txn_date: date,
+                    office_id: officeId,
+                    office_name: String(row.office_name == null ? (row['office-name'] || '') : row.office_name),
+                    office_type: String(row.office_type == null ? (row['office-type'] || 'N/A') : row.office_type),
+                    division: String(row.division == null ? '' : row.division),
+                    sub_division: String(row.sub_division == null ? (row['sub-division'] || '') : row.sub_division),
+                    cash: safeNum(row.cash),
+                    pos: safeNum(row.pos),
+                    qr: safeNum(row.qr),
+                    total_digital: safeNum(row.total_digital),
+                    total_txns: safeNum(row.total_txns),
+                    pct: row.pct == null || row.pct === '' ? '' : safeNum(row.pct)
+                });
+                day.changed = true;
+                day.uploadedAt = new Date().toISOString();
+                accepted++;
+            });
+
+            const daysToWrite = Array.from(days.values()).filter(day => day.changed);
+            if (daysToWrite.length) {
+                const writeDb = await openIndexedDB();
+                await new Promise((resolve, reject) => {
+                    const tx = writeDb.transaction(STORE_NAME, 'readwrite');
+                    const store = tx.objectStore(STORE_NAME);
+                    daysToWrite.forEach(day => store.put({
+                        txn_date: day.txn_date,
+                        fileName: day.fileName,
+                        records: Array.from(day.recordMap.values()),
+                        uploadedAt: day.uploadedAt || new Date().toISOString()
+                    }));
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error || new Error('Could not save Google records locally'));
+                    tx.onabort = () => reject(tx.error || new Error('Local database merge was cancelled'));
+                });
+                writeDb.close();
+            }
+            return { accepted, skipped, daysUpdated: daysToWrite.length };
+        }
+
+        async function syncRecordsFromGoogleSheet() {
+            const statusEl = document.getElementById('upload-status-text');
+            try {
+                statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Fetching records from Google Sheets…';
+                const response = await fetchGoogleRecordsJSONP();
+                const mergeResult = await mergeGoogleRecordsIntoLocalDatabase(response.records);
+                const allDays = await loadFromLocalDatabase();
+                const latestDate = allDays.length ? allDays[allDays.length - 1].txn_date : '';
+                const latestLabel = latestDate ? ' · Data through ' + formatDateIndian(latestDate) : ' · No saved dates yet';
+                statusEl.innerHTML =
+                    `<span style="color:var(--success);font-weight:bold;"><i class="fas fa-check-circle"></i> Google Sheets online · ${response.records.length} records received · ${mergeResult.accepted} merged into local DB${latestLabel}</span> <span style="font-size:11px;opacity:.85;">Synced ${new Date().toLocaleString('en-IN')}</span>`;
             } catch (err) {
-                console.warn("Could not load from IndexedDB:", err);
+                console.warn('Google Sheets download failed; local data will be retained:', err);
+                const allDays = await loadFromLocalDatabase();
+                const latestDate = allDays.length ? allDays[allDays.length - 1].txn_date : '';
+                statusEl.innerHTML =
+                    `<span style="color:var(--danger);font-weight:bold;"><i class="fas fa-exclamation-circle"></i> Google Sheets unavailable · showing local data only${latestDate ? ' · Data through ' + formatDateIndian(latestDate) : ''}</span> <span style="font-size:11px;opacity:.85;">${escapeHtml(err.message || 'Sync error')} · ${new Date().toLocaleString('en-IN')}</span>`;
             }
         }
 
@@ -1467,9 +1622,11 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             initDragAndDrop();
-            loadFromLocalDatabase();
+            // Render local IndexedDB immediately, then download/merge the Google Sheet data.
+            await loadFromLocalDatabase();
+            await syncRecordsFromGoogleSheet();
         });
 
         function initDragAndDrop() {
