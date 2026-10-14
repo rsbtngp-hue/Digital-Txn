@@ -1228,6 +1228,9 @@
                     });
                     sent += batch.length;
                 }
+                if (statusEl && !options.silent) {
+                    statusEl.innerHTML = `<span style="color:var(--success);font-weight:bold;"><i class="fas fa-cloud-upload-alt"></i> Submitted ${sent} local records to Google Sheets. The next Google read will reconcile and verify what is stored.</span>`;
+                }
                 return { ok: true, sent, failed: 0, verificationRequired: true };
             } catch (err) {
                 console.error("Google Sheet sync error:", err);
@@ -1238,12 +1241,15 @@
             }
         }
 
-        function uploadDataToGoogleSheet() {
+        async function uploadDataToGoogleSheet() {
             if (rawParsedRecords.length === 0) {
                 alert("No data loaded locally to upload.");
                 return;
             }
-            syncRecordsToSheet(rawParsedRecords);
+            const result = await syncRecordsToSheet(rawParsedRecords);
+            if (result.ok) {
+                await syncRecordsFromGoogleSheet({ reason: 'manual-full-sync' });
+            }
         }
 
         function escapeHtml(str) {
