@@ -1205,25 +1205,36 @@
             }
         }
 
-        async function syncRecordsToSheet(records) {
-            if (!records || records.length === 0) return;
-            const statusEl = document.getElementById('upload-status-text');
-            const originalText = statusEl.innerHTML;
-            statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing to Google Sheet Online...';
-
+        async function syncRecordsToSheet(records, options = {}) {
+            if (!Array.isArray(records) || records.length === 0) {
+                return { ok: true, sent: 0, failed: 0 };
+            }
+            const statusEl = document.getElementById('google-sync-status') || document.getElementById('upload-status-text');
+            const batchSize = 250;
+            let sent = 0;
             try {
-                const payload = { action: "appendRecords", records: records };
-                await fetch(GSHEET_WEB_APP_URL, {
-                    method: "POST",
-                    mode: "no-cors",
-                    headers: { "Content-Type": "text/plain" },
-                    body: JSON.stringify(payload)
-                });
-                statusEl.innerHTML = `<span style="color: var(--success); font-weight: bold;"><i class="fas fa-check-circle"></i> Successfully synced ${records.length} records to Google Sheet.</span>`;
-                setTimeout(() => { statusEl.innerHTML = originalText; }, 4000);
+                for (let offset = 0; offset < records.length; offset += batchSize) {
+                    const batch = records.slice(offset, offset + batchSize);
+                    if (statusEl && !options.silent) {
+                        statusEl.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sending local records to Google Sheets… ${Math.min(offset + batch.length, records.length)} / ${records.length}`;
+                    }
+                    // Apps Script's cross-origin response may be opaque in the browser.
+                    // Treat a resolved request as "sent", not as independently verified.
+                    await fetch(GSHEET_WEB_APP_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "text/plain" },
+                        body: JSON.stringify({ action: "appendRecords", records: batch })
+                    });
+                    sent += batch.length;
+                }
+                return { ok: true, sent, failed: 0, verificationRequired: true };
             } catch (err) {
                 console.error("Google Sheet sync error:", err);
-                statusEl.innerHTML = `<span style="color: var(--danger); font-weight: bold;"><i class="fas fa-times-circle"></i> Sync failed. Check URL.</span>`;
+                if (statusEl && !options.silent) {
+                    statusEl.innerHTML = `<span style="color:var(--danger);font-weight:bold;"><i class="fas fa-exclamation-circle"></i> ${sent} records sent before the connection failed; remaining records are retained locally and will be retried on the next sync.</span>`;
+                }
+                return { ok: false, sent, failed: records.length - sent, error: err };
             }
         }
 
@@ -1398,22 +1409,42 @@
         }
 
         async function appendDayToIndexedDB(dateStr, fileName, records) {
+            // Merge by office ID so uploading a partial CSV for a date never erases
+            // other offices already stored for that same date.
+            const db = await openIndexedDB();
             try {
-                const db = await openIndexedDB();
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                store.put({
-                    txn_date: dateStr,
-                    fileName: fileName,
-                    records: records,
-                    uploadedAt: new Date().toISOString()
-                });
-                return new Promise((resolve, reject) => {
-                    tx.oncomplete = () => resolve();
-                    tx.onerror = (e) => reject(e.target.error);
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(STORE_NAME, 'readwrite');
+                    const store = tx.objectStore(STORE_NAME);
+                    const readReq = store.get(dateStr);
+                    readReq.onsuccess = () => {
+                        const existingDay = readReq.result || {};
+                        const byOffice = new Map();
+                        (existingDay.records || []).forEach(record => {
+                            const id = String(record.office_id == null ? '' : record.office_id).trim();
+                            if (id) byOffice.set(id, { ...record, txn_date: dateStr, office_id: id });
+                        });
+                        (records || []).forEach(record => {
+                            const id = String(record.office_id == null ? '' : record.office_id).trim();
+                            if (id) byOffice.set(id, { ...record, txn_date: dateStr, office_id: id });
+                        });
+                        store.put({
+                            txn_date: dateStr,
+                            fileName: fileName || existingDay.fileName || 'CSV upload',
+                            records: Array.from(byOffice.values()),
+                            uploadedAt: new Date().toISOString()
+                        });
+                    };
+                    readReq.onerror = () => reject(readReq.error || new Error('Unable to read existing local date'));
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error || new Error('Unable to save CSV records locally'));
+                    tx.onabort = () => reject(tx.error || new Error('Local CSV save was cancelled'));
                 });
             } catch (err) {
-                console.warn("IndexedDB append failed:", err);
+                console.error('IndexedDB save failed:', err);
+                throw err;
+            } finally {
+                db.close();
             }
         }
 
@@ -1509,6 +1540,44 @@
             return '';
         }
 
+        async function getLocalRecordsMissingFromGoogle(remoteRecords) {
+            const db = await openIndexedDB();
+            let allDays;
+            try {
+                allDays = await new Promise((resolve, reject) => {
+                    const tx = db.transaction(STORE_NAME, 'readonly');
+                    const req = tx.objectStore(STORE_NAME).getAll();
+                    req.onsuccess = () => resolve(req.result || []);
+                    req.onerror = () => reject(req.error || new Error('Could not compare local records with Google Sheets'));
+                });
+            } finally {
+                db.close();
+            }
+
+            const remoteKeys = new Set();
+            (remoteRecords || []).forEach(record => {
+                const date = normalizeGoogleTxnDate(record.txn_date || record['txn-date'] || record.date);
+                const officeId = String(record.office_id == null ? (record['office-id'] || '') : record.office_id).trim();
+                if (date && officeId) remoteKeys.add(date + '|' + officeId);
+            });
+
+            const missing = [];
+            (allDays || []).forEach(day => {
+                const date = normalizeGoogleTxnDate(day.txn_date);
+                if (!date) return;
+                (day.records || []).forEach(record => {
+                    const officeId = String(record.office_id == null ? (record['office-id'] || '') : record.office_id).trim();
+                    if (!officeId) return;
+                    const key = date + '|' + officeId;
+                    if (!remoteKeys.has(key)) {
+                        missing.push({ ...record, txn_date: date, office_id: officeId });
+                        remoteKeys.add(key); // Avoid duplicates inside a malformed local day payload.
+                    }
+                });
+            });
+            return missing;
+        }
+
         async function mergeGoogleRecordsIntoLocalDatabase(remoteRecords) {
             const db = await openIndexedDB();
             const existingDays = await new Promise((resolve, reject) => {
@@ -1554,6 +1623,9 @@
                     });
                 }
                 const day = days.get(date);
+                // Keep local values when the date + office already exists; import only
+                // Google-only rows and never silently replace a local CSV record.
+                if (day.recordMap.has(officeId)) return;
                 day.recordMap.set(officeId, {
                     txn_date: date,
                     office_id: officeId,
@@ -1594,23 +1666,41 @@
             return { accepted, skipped, daysUpdated: daysToWrite.length };
         }
 
-        async function syncRecordsFromGoogleSheet() {
+        let googleSyncInProgress = false;
+        async function syncRecordsFromGoogleSheet(options = {}) {
+            if (googleSyncInProgress) return;
+            googleSyncInProgress = true;
             const statusEl = document.getElementById('google-sync-status') || document.getElementById('upload-status-text');
             try {
-                statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Local data loaded where available · Fetching records from Google Sheets…';
+                statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking Google Sheets and reconciling local records…';
                 const response = await fetchGoogleRecordsJSONP();
+
+                // Compare before merging: local-only rows are uploaded back to Google.
+                const localMissing = await getLocalRecordsMissingFromGoogle(response.records);
                 const mergeResult = await mergeGoogleRecordsIntoLocalDatabase(response.records);
+
+                let uploadResult = { ok: true, sent: 0, failed: 0 };
+                if (localMissing.length) {
+                    uploadResult = await syncRecordsToSheet(localMissing, { silent: true });
+                }
+
                 const allDays = await loadFromLocalDatabase();
                 const latestDate = allDays.length ? allDays[allDays.length - 1].txn_date : '';
                 const latestLabel = latestDate ? ' · Data through ' + formatDateIndian(latestDate) : ' · No saved dates yet';
+                let uploadLabel = localMissing.length
+                    ? ` · ${uploadResult.sent || 0}/${localMissing.length} local-only records sent to Google for upsert`
+                    : ' · No local-only records to upload';
+                if (!uploadResult.ok) uploadLabel += ' · unsent records will retry on a later sync';
                 statusEl.innerHTML =
-                    `<span style="color:var(--success);font-weight:bold;"><i class="fas fa-check-circle"></i> Google Sheets online · ${response.records.length} records received · ${mergeResult.accepted} merged into local DB${latestLabel}</span> <span style="font-size:11px;opacity:.85;">Synced ${new Date().toLocaleString('en-IN')}</span>`;
+                    `<span style="color:var(--success);font-weight:bold;"><i class="fas fa-check-circle"></i> Google Sheets reachable · ${response.records.length} records downloaded · ${mergeResult.accepted} Google-only records added locally${uploadLabel}${latestLabel}</span> <span style="font-size:11px;opacity:.85;">Sync checked ${new Date().toLocaleString('en-IN')}. Cross-origin uploads are confirmed on the next Google read.</span>`;
             } catch (err) {
-                console.warn('Google Sheets download failed; local data will be retained:', err);
+                console.warn('Google Sheets download/reconciliation failed; local data will be retained:', err);
                 const allDays = await loadFromLocalDatabase();
                 const latestDate = allDays.length ? allDays[allDays.length - 1].txn_date : '';
                 statusEl.innerHTML =
-                    `<span style="color:var(--danger);font-weight:bold;"><i class="fas fa-exclamation-circle"></i> Google Sheets unavailable · showing local data only${latestDate ? ' · Data through ' + formatDateIndian(latestDate) : ''}</span> <span style="font-size:11px;opacity:.85;">${escapeHtml(err.message || 'Sync error')} · ${new Date().toLocaleString('en-IN')}</span>`;
+                    `<span style="color:var(--danger);font-weight:bold;"><i class="fas fa-exclamation-circle"></i> Google Sheets unavailable · local records retained${latestDate ? ' · Data through ' + formatDateIndian(latestDate) : ''}</span> <span style="font-size:11px;opacity:.85;">${escapeHtml(err.message || 'Sync error')} · ${new Date().toLocaleString('en-IN')}</span>`;
+            } finally {
+                googleSyncInProgress = false;
             }
         }
 
@@ -1628,9 +1718,13 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             initDragAndDrop();
-            // Render local IndexedDB immediately, then download/merge the Google Sheet data.
+            // Render local IndexedDB immediately, then reconcile both data stores.
             await loadFromLocalDatabase();
             await syncRecordsFromGoogleSheet();
+        });
+
+        window.addEventListener('online', () => {
+            if (!googleSyncInProgress) syncRecordsFromGoogleSheet({ reason: 'connection-restored' });
         });
 
         function initDragAndDrop() {
@@ -1853,13 +1947,27 @@
                     }
 
                     const dates = Object.keys(groupedByDate).sort();
+                    if (!newRecordsToUpload.length) {
+                        statusEl.textContent = 'No valid transaction rows found in this CSV; nothing was saved.';
+                        return;
+                    }
+
+                    // Commit locally first; only after every date is saved do we send
+                    // records to Google. Local history remains available offline.
                     for (const d of dates) {
                         await appendDayToIndexedDB(d, file.name, groupedByDate[d]);
                     }
-
                     await loadFromLocalDatabase();
-                    
-                    await syncRecordsToSheet(newRecordsToUpload);
+
+                    const sentResult = await syncRecordsToSheet(newRecordsToUpload, { silent: true });
+                    if (sentResult.ok) {
+                        statusEl.innerHTML = `<span style="color:var(--success);font-weight:bold;">CSV saved locally: ${newRecordsToUpload.length} records across ${dates.length} date(s). Google upload request sent; verifying and reconciling…</span>`;
+                    } else {
+                        statusEl.innerHTML = `<span style="color:var(--danger);font-weight:bold;">CSV saved locally: ${newRecordsToUpload.length} records. Google unavailable; records will remain local and be retried on the next sync.</span>`;
+                    }
+                    // Reads Google back and automatically uploads all rows missing there,
+                    // including local records from earlier offline sessions.
+                    await syncRecordsFromGoogleSheet({ reason: 'csv-upload' });
 
                 } catch (err) {
                     alert("Error processing CSV: " + err.message);
