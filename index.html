@@ -812,12 +812,13 @@
             </section>
 
             <section class="report-banner-card" id="capture-summary-card">
-                <div class="banner-header">
+                <div class="banner-header" style="padding: 16px 112px 48px;">
                     <div style="flex: 1;">
                         <div class="banner-title" id="banner-title-text">Digital Transaction Report - Nagpur Region</div>
-                        <div class="banner-subtitle" id="banner-date-range">Report Dated from 12.09.2026 to 12.09.2026</div>
+                        <div class="banner-subtitle" id="banner-date-range">Report Dated from 15.10.2026 to 15.10.2026</div>
                     </div>
-                    <div style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: flex; gap: 8px; flex-wrap: wrap;" data-html2canvas-ignore="true" data-pdf-ignore="true">
+                    <img class="summary-india-post-logo" id="summary-india-post-logo" alt="India Post Official Logo" style="position:absolute;right:18px;top:10px;width:78px;height:auto;max-height:58px;object-fit:contain;background:#fff;border-radius:4px;padding:2px;" />
+                    <div style="position: absolute; right: 12px; bottom: 7px; display: flex; gap: 8px; flex-wrap: wrap;" data-html2canvas-ignore="true" data-pdf-ignore="true">
                         <button type="button" class="btn-action" onclick="copyBannerReportImage()" title="Copy entire section as an image">
                             <i class="fas fa-camera"></i> <span id="copy-img-btn-text">Copy to Image</span>
                         </button>
@@ -2388,6 +2389,14 @@
                 </tr>
             `;
         }
+
+        // Reuse the already embedded official India Post logo so the summary image works offline.
+        function setSummaryIndiaPostLogo() {
+            const target = document.getElementById('summary-india-post-logo');
+            const embeddedLogo = document.querySelector('#main-navbar .logo-section img, .pdf-page-header .logo-section img');
+            if (target && embeddedLogo && embeddedLogo.src) target.src = embeddedLogo.src;
+        }
+        document.addEventListener('DOMContentLoaded', setSummaryIndiaPostLogo);
 
         async function copyBannerReportImage() {
             const card = document.getElementById('capture-summary-card');
