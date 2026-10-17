@@ -761,11 +761,11 @@
                 <div class="filter-grid">
                     <div class="form-group">
                         <label for="filter-from-date"><i class="fas fa-calendar-alt"></i> From Date</label>
-                        <input type="date" id="filter-from-date" class="form-control" value="2026-09-12" onchange="applyFilters()">
+                        <input type="date" id="filter-from-date" class="form-control" onchange="applyFilters()">
                     </div>
                     <div class="form-group">
                         <label for="filter-to-date"><i class="fas fa-calendar-check"></i> To Date</label>
-                        <input type="date" id="filter-to-date" class="form-control" value="2026-09-12" onchange="applyFilters()">
+                        <input type="date" id="filter-to-date" class="form-control" onchange="applyFilters()">
                     </div>
                     <div class="form-group">
                         <label for="filter-division"><i class="fas fa-sitemap"></i> Division</label>
@@ -1546,7 +1546,9 @@
                 });
 
                 const latestDate = allDays[allDays.length - 1].txn_date;
-                document.getElementById('filter-from-date').value = allDays[0].txn_date;
+                // Default both date filters to the latest available booking/transaction date.
+                // Users can widen the range manually when they need historical data.
+                document.getElementById('filter-from-date').value = latestDate;
                 document.getElementById('filter-to-date').value = latestDate;
                 populateDropdownsFromData();
                 renderOfficeExclusionControls();
