@@ -694,9 +694,72 @@
         @media (max-width: 768px) { .filter-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 600px) { .stats-grid, .filter-grid { grid-template-columns: 1fr; } .upload-row { flex-direction: column; align-items: stretch; } }
     </style>
+
+<!-- Nagpur Region employee portal access gate -->
+<style id="npr-employee-access-style">
+html body{visibility:hidden!important}
+html body.npr-auth-ok{visibility:visible!important}
+#nprAuthChecking{visibility:visible!important;position:fixed!important;inset:0!important;z-index:2147483647!important;display:flex!important;align-items:center!important;justify-content:center!important;background:#f3f6fb!important;color:#14213d!important;font:16px Arial,sans-serif!important;text-align:center!important;padding:24px!important;box-sizing:border-box!important}
+</style>
 </head>
 
-<body id="entire-report-page">
+<body id="entire-report-page"><script id="nprEmployeeDashboardAccessGate">
+(function(){
+ 'use strict';
+ var PORTAL="https://script.google.com/macros/s/AKfycbwGfQLoPhrb-RYfcvCNOFIlkluPEf64UvcIHMjNMDAfXTocNZSGtbf-Hw-tmv6EAmSi/exec";
+ var HOME='https://ronagpur.com/';
+ var TOKEN='nagpurEmployeePortalToken', NAME='nagpurEmployeePortalName', ROLE='nagpurEmployeePortalRole';
+ var overlay=document.createElement('div');
+ overlay.id='nprAuthChecking';
+ overlay.textContent='Verifying employee login…';
+ document.documentElement.appendChild(overlay);
+ function clearSession(){
+  try{sessionStorage.removeItem(TOKEN);sessionStorage.removeItem(NAME);sessionStorage.removeItem(ROLE);}catch(e){}
+ }
+ function goLogin(){
+  location.replace(PORTAL+'?returnTo='+encodeURIComponent(HOME));
+ }
+ function validate(token, done){
+  var cb='__nprDashAuth'+Date.now()+Math.floor(Math.random()*100000);
+  var script=document.createElement('script'), finished=false;
+  var timer=setTimeout(function(){finish(null);},12000);
+  function finish(data){
+   if(finished)return; finished=true; clearTimeout(timer);
+   try{delete window[cb];}catch(e){window[cb]=undefined;}
+   if(script.parentNode)script.parentNode.removeChild(script);
+   done(data);
+  }
+  window[cb]=function(data){finish(data);};
+  script.onerror=function(){finish(null);};
+  script.src=PORTAL+'?action=homeAuth&op=validate&token='+encodeURIComponent(token)+'&callback='+encodeURIComponent(cb);
+  document.head.appendChild(script);
+ }
+ function fail(){
+  clearSession();
+  overlay.textContent='Login required. Redirecting to the employee portal…';
+  goLogin();
+ }
+ var token='';
+ try{token=sessionStorage.getItem(TOKEN)||'';}catch(e){}
+ if(!token){fail();return;}
+ validate(token,function(data){
+  if(!data||!data.ok){fail();return;}
+  try{
+   sessionStorage.setItem(NAME,data.name||sessionStorage.getItem(NAME)||'');
+   sessionStorage.setItem(ROLE,data.role||sessionStorage.getItem(ROLE)||'employee');
+  }catch(e){}
+  document.body.classList.add('npr-auth-ok');
+  if(overlay.parentNode)overlay.parentNode.removeChild(overlay);
+  window.setInterval(function(){
+   if(document.visibilityState==='hidden')return;
+   var current='';
+   try{current=sessionStorage.getItem(TOKEN)||'';}catch(e){}
+   if(!current){fail();return;}
+   validate(current,function(check){if(!check||!check.ok)fail();});
+  },120000);
+ });
+})();
+</script>
     <header class="govt-header" id="main-navbar">
         <div class="header-content">
             <div class="logo-section">
