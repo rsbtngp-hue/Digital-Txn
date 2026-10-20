@@ -707,57 +707,26 @@ html body.npr-auth-ok{visibility:visible!important}
 (function(){
  'use strict';
  var PORTAL="https://script.google.com/macros/s/AKfycbwGfQLoPhrb-RYfcvCNOFIlkluPEf64UvcIHMjNMDAfXTocNZSGtbf-Hw-tmv6EAmSi/exec";
- var HOME='https://ronagpur.com/';
- var TOKEN='nagpurEmployeePortalToken', NAME='nagpurEmployeePortalName', ROLE='nagpurEmployeePortalRole';
- var overlay=document.createElement('div');
- overlay.id='nprAuthChecking';
- overlay.textContent='Verifying employee login…';
- document.documentElement.appendChild(overlay);
- function clearSession(){
-  try{localStorage.removeItem(TOKEN);localStorage.removeItem(NAME);localStorage.removeItem(ROLE);}catch(e){}
- }
- function goLogin(){
-  location.replace(PORTAL+'?returnTo='+encodeURIComponent(HOME));
- }
- function validate(token, done){
-  var cb='__nprDashAuth'+Date.now()+Math.floor(Math.random()*100000);
-  var script=document.createElement('script'), finished=false;
-  var timer=setTimeout(function(){finish(null);},12000);
-  function finish(data){
-   if(finished)return; finished=true; clearTimeout(timer);
-   try{delete window[cb];}catch(e){window[cb]=undefined;}
-   if(script.parentNode)script.parentNode.removeChild(script);
-   done(data);
+ var TOKEN='nagpurEmployeePortalToken';
+ var overlay=document.getElementById('nprAuthChecking');
+ function showDashboard(){
+  function reveal(){
+   if(document.body)document.body.classList.add('npr-auth-ok');
+   if(overlay&&overlay.parentNode)overlay.parentNode.removeChild(overlay);
   }
-  window[cb]=function(data){finish(data);};
-  script.onerror=function(){finish(null);};
-  script.src=PORTAL+'?action=homeAuth&op=validate&token='+encodeURIComponent(token)+'&callback='+encodeURIComponent(cb);
-  document.head.appendChild(script);
- }
- function fail(){
-  clearSession();
-  overlay.textContent='Login required. Redirecting to the employee portal…';
-  goLogin();
+  if(document.body)reveal();
+  else document.addEventListener('DOMContentLoaded',reveal,{once:true});
  }
  var token='';
  try{token=localStorage.getItem(TOKEN)||'';}catch(e){}
- if(!token){fail();return;}
- validate(token,function(data){
-  if(!data||!data.ok){fail();return;}
-  try{
-   localStorage.setItem(NAME,data.name||localStorage.getItem(NAME)||'');
-   localStorage.setItem(ROLE,data.role||localStorage.getItem(ROLE)||'employee');
-  }catch(e){}
-  document.body.classList.add('npr-auth-ok');
-  if(overlay.parentNode)overlay.parentNode.removeChild(overlay);
-  window.setInterval(function(){
-   if(document.visibilityState==='hidden')return;
-   var current='';
-   try{current=localStorage.getItem(TOKEN)||'';}catch(e){}
-   if(!current){fail();return;}
-   validate(current,function(check){if(!check||!check.ok)fail();});
-  },120000);
- });
+ if(token){
+  // The main portal already validated the employee. Do not revalidate on every
+  // static dashboard page; a transient Apps Script failure must not force login.
+  showDashboard();
+  return;
+ }
+ var returnTo=window.location.href;
+ window.location.replace(PORTAL+'?returnTo='+encodeURIComponent(returnTo));
 })();
 </script>
     <header class="govt-header" id="main-navbar">
