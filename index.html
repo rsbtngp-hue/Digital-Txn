@@ -714,7 +714,7 @@ html body.npr-auth-ok{visibility:visible!important}
  overlay.textContent='Verifying employee login…';
  document.documentElement.appendChild(overlay);
  function clearSession(){
-  try{sessionStorage.removeItem(TOKEN);sessionStorage.removeItem(NAME);sessionStorage.removeItem(ROLE);}catch(e){}
+  try{localStorage.removeItem(TOKEN);localStorage.removeItem(NAME);localStorage.removeItem(ROLE);}catch(e){}
  }
  function goLogin(){
   location.replace(PORTAL+'?returnTo='+encodeURIComponent(HOME));
@@ -740,20 +740,20 @@ html body.npr-auth-ok{visibility:visible!important}
   goLogin();
  }
  var token='';
- try{token=sessionStorage.getItem(TOKEN)||'';}catch(e){}
+ try{token=localStorage.getItem(TOKEN)||'';}catch(e){}
  if(!token){fail();return;}
  validate(token,function(data){
   if(!data||!data.ok){fail();return;}
   try{
-   sessionStorage.setItem(NAME,data.name||sessionStorage.getItem(NAME)||'');
-   sessionStorage.setItem(ROLE,data.role||sessionStorage.getItem(ROLE)||'employee');
+   localStorage.setItem(NAME,data.name||localStorage.getItem(NAME)||'');
+   localStorage.setItem(ROLE,data.role||localStorage.getItem(ROLE)||'employee');
   }catch(e){}
   document.body.classList.add('npr-auth-ok');
   if(overlay.parentNode)overlay.parentNode.removeChild(overlay);
   window.setInterval(function(){
    if(document.visibilityState==='hidden')return;
    var current='';
-   try{current=sessionStorage.getItem(TOKEN)||'';}catch(e){}
+   try{current=localStorage.getItem(TOKEN)||'';}catch(e){}
    if(!current){fail();return;}
    validate(current,function(check){if(!check||!check.ok)fail();});
   },120000);
