@@ -55,6 +55,13 @@ function doPost(e) {
     const result = upsertRecords_(records);
     return output_({ok:true, action:action, received:records.length, ...result}, e);
   }
+  if (action === 'replaceDates') {
+    const dates = Array.isArray(payload.dates) ? payload.dates.map(normalizeDate_).filter(Boolean) : [];
+    const records = Array.isArray(payload.records) ? payload.records : [];
+    if (!dates.length) return output_({ok:false, error:'replaceDates requires one or more valid dates'}, e);
+    const result = replaceDates_(dates, records);
+    return output_({ok:true, action:action, dates:dates, received:records.length, ...result}, e);
+  }
   return output_({ok:false, error:'Unknown action: ' + action}, e);
 }
 
@@ -95,59 +102,107 @@ function setupSpreadsheet() {
 }
 
 function upsertRecords_(records) {
-  if (!records.length) return {insertedOrUpdated:0, skipped:0};
+  if (!records.length) return {inserted:0, updated:0, skipped:0};
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(DATA_SHEET);
+    if (!sheet) { setupSpreadsheet(); sheet = ss.getSheetByName(DATA_SHEET); }
+    const lastRow = sheet.getLastRow();
+    const existing = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 2).getDisplayValues() : [];
+    const rowByKey = new Map();
+    existing.forEach((r, i) => {
+      const key = normalizeDate_(r[0]) + '|' + String(r[1]).trim();
+      if (r[0] && r[1]) rowByKey.set(key, i + 2);
+    });
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(DATA_SHEET);
-  if (!sheet) {
-    setupSpreadsheet();
-    sheet = ss.getSheetByName(DATA_SHEET);
-  }
-  const lastRow = sheet.getLastRow();
-  const existing = lastRow > 1
-    ? sheet.getRange(2, 1, lastRow - 1, 2).getDisplayValues()
-    : [];
-  const rowByKey = new Map();
-  existing.forEach((r, i) => rowByKey.set(String(r[0]).trim() + '|' + String(r[1]).trim(), i + 2));
+    let skipped = 0, inserted = 0, updated = 0;
+    const appendRows = [];
+    const updates = [];
+    const now = new Date().toISOString();
+    records.forEach(r => {
+      const date = normalizeDate_(r.txn_date || r['txn-date'] || r.date);
+      const officeId = String(r.office_id || r['office-id'] || '').trim();
+      if (!date || !officeId) { skipped++; return; }
+      const row = recordToRow_(r, date, officeId, now);
+      const key = date + '|' + officeId;
+      if (rowByKey.has(key)) {
+        const rowNo = rowByKey.get(key);
+        if (rowNo === -1) {
+          const index = appendRows.findIndex(x => x[0] === date && String(x[1]) === officeId);
+          if (index >= 0) appendRows[index] = row;
+        } else {
+          updates.push({rowNo:rowNo, values:row});
+          updated++;
+        }
+      } else {
+        appendRows.push(row);
+        rowByKey.set(key, -1);
+        inserted++;
+      }
+    });
 
-  let insertedOrUpdated = 0;
-  let skipped = 0;
-  const appendRows = [];
-  const updateRows = [];
-
-  records.forEach(r => {
-    const date = normalizeDate_(r.txn_date || r['txn-date'] || r.date);
-    const officeId = String(r.office_id || r['office-id'] || '').trim();
-    if (!date || !officeId) { skipped++; return; }
-    const row = [
-      date, officeId, value_(r.office_name || r['office-name']),
-      value_(r.office_type || r['office-type']), value_(r.division),
-      value_(r.sub_division || r['sub-division']), number_(r.cash),
-      number_(r.pos), number_(r.qr), number_(r.total_digital),
-      number_(r.total_txns), value_(r.pct), new Date().toISOString()
-    ];
-    const key = date + '|' + officeId;
-    const rowNo = rowByKey.get(key);
-    if (rowNo && rowNo <= sheet.getLastRow()) updateRows.push({rowNo:rowNo, values:row});
-    else if (rowNo) appendRows[rowNo - sheet.getLastRow() - 1] = row;
-    else {
-      const newRowNo = sheet.getLastRow() + appendRows.length + 1;
-      appendRows.push(row);
-      rowByKey.set(key, newRowNo);
+    updates.sort((a,b) => a.rowNo - b.rowNo);
+    let i = 0;
+    while (i < updates.length) {
+      let j = i + 1;
+      while (j < updates.length && updates[j].rowNo === updates[j-1].rowNo + 1) j++;
+      sheet.getRange(updates[i].rowNo, 1, j-i, HEADERS.length).setValues(updates.slice(i,j).map(x=>x.values));
+      i = j;
     }
-  });
+    if (appendRows.length) sheet.getRange(sheet.getLastRow()+1, 1, appendRows.length, HEADERS.length).setValues(appendRows);
+    markSuccessfulSync_();
+    return {inserted:inserted, updated:updated, skipped:skipped};
+  } finally { lock.releaseLock(); }
+}
 
-  updateRows.forEach(item => sheet.getRange(item.rowNo, 1, 1, HEADERS.length).setValues([item.values]));
-  if (appendRows.length) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, appendRows.length, HEADERS.length).setValues(appendRows);
-  }
+function replaceDates_(dates, records) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(DATA_SHEET);
+    if (!sheet) { setupSpreadsheet(); sheet = ss.getSheetByName(DATA_SHEET); }
+    const dateSet = new Set(dates);
+    const lastRow = sheet.getLastRow();
+    const existingRows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues() : [];
+    const keepRows = existingRows.filter(row => !dateSet.has(normalizeDate_(row[0])));
+    const newRows = [];
+    const seen = new Set();
+    let skipped = 0;
+    const now = new Date().toISOString();
+    records.forEach(r => {
+      const date = normalizeDate_(r.txn_date || r['txn-date'] || r.date);
+      const officeId = String(r.office_id || r['office-id'] || '').trim();
+      if (!date || !officeId || !dateSet.has(date)) { skipped++; return; }
+      const key = date + '|' + officeId;
+      if (seen.has(key)) return;
+      seen.add(key);
+      newRows.push(recordToRow_(r, date, officeId, now));
+    });
+    if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, HEADERS.length).clearContent();
+    const finalRows = keepRows.concat(newRows);
+    if (finalRows.length) sheet.getRange(2, 1, finalRows.length, HEADERS.length).setValues(finalRows);
+    markSuccessfulSync_();
+    return {replacedDates:dates.length, removed:existingRows.length-keepRows.length, inserted:newRows.length, skipped:skipped};
+  } finally { lock.releaseLock(); }
+}
 
+function recordToRow_(r, date, officeId, now) {
+  return [
+    date, officeId, value_(r.office_name || r['office-name']),
+    value_(r.office_type || r['office-type']), value_(r.division),
+    value_(r.sub_division || r['sub-division']), number_(r.cash),
+    number_(r.pos), number_(r.qr), number_(r.total_digital),
+    number_(r.total_txns), value_(r.pct), now
+  ];
+}
+
+function markSuccessfulSync_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const meta = ss.getSheetByName(META_SHEET);
-  if (meta) {
-    const row = Math.max(meta.getLastRow() + 1, 4);
-    meta.getRange(4, 1, 1, 2).setValues([['Last Successful Sync', new Date().toISOString()]]);
-  }
-  return {insertedOrUpdated:updateRows.length + appendRows.length, updated:updateRows.length, inserted:appendRows.length, skipped:skipped};
+  if (meta) meta.getRange(4, 1, 1, 2).setValues([['Last Successful Sync', new Date().toISOString()]]);
 }
 
 function readRecords_() {
