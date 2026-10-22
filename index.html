@@ -746,7 +746,13 @@
 
                     <div style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
                         <i class="fas fa-database" style="color: var(--info);"></i>
-                        <span id="upload-status-text">Upload daily CSVs. Data will auto-sync to your Google Sheet online.</span>
+                        <span id="upload-status-text">Upload CSVs using Append (add/merge) or Replace (replace uploaded dates). Only uploaded rows are sent to Google Sheets.</span>
+                    <label style="font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap;">CSV mode
+                        <select id="csv-upload-mode" style="padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--bg-surface);color:var(--text-primary);font-weight:600;">
+                            <option value="append" selected>Append / Merge</option>
+                            <option value="replace">Replace uploaded dates</option>
+                        </select>
+                    </label>
                     </div>
                 </div>
 
@@ -1307,15 +1313,27 @@
             }
         }
 
+        async function sendReplaceDatesToSheet(dates, records) {
+            try {
+                await fetch(GSHEET_WEB_APP_URL, {
+                    method: "POST", mode: "no-cors",
+                    headers: { "Content-Type": "text/plain" },
+                    body: JSON.stringify({ action: "replaceDates", dates, records })
+                });
+                return { ok: true, sent: records.length, verificationRequired: true };
+            } catch (err) {
+                console.error("Google Sheet replace error:", err);
+                return { ok: false, sent: 0, failed: records.length, error: err };
+            }
+        }
+
         async function uploadDataToGoogleSheet() {
             if (rawParsedRecords.length === 0) {
                 alert("No data loaded locally to upload.");
                 return;
             }
-            const result = await syncRecordsToSheet(rawParsedRecords);
-            if (result.ok) {
-                await syncRecordsFromGoogleSheet({ reason: 'manual-full-sync' });
-            }
+            // Incremental reconciliation uploads only local records absent from Google.
+            await syncRecordsFromGoogleSheet({ reason: 'manual-incremental-sync' });
         }
 
         function escapeHtml(str) {
@@ -1478,6 +1496,27 @@
                 request.onsuccess = (e) => resolve(e.target.result);
                 request.onerror = (e) => reject(e.target.error);
             });
+        }
+
+        async function replaceDayInIndexedDB(dateStr, fileName, records) {
+            const db = await openIndexedDB();
+            try {
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(STORE_NAME, 'readwrite');
+                    tx.objectStore(STORE_NAME).put({
+                        txn_date: dateStr,
+                        fileName: fileName || 'CSV upload (replace)',
+                        records: (records || []).map(record => ({
+                            ...record, txn_date: dateStr,
+                            office_id: String(record.office_id == null ? '' : record.office_id).trim()
+                        })).filter(record => record.office_id),
+                        uploadedAt: new Date().toISOString()
+                    });
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error || new Error('Unable to replace local date'));
+                    tx.onabort = () => reject(tx.error || new Error('Local date replacement was cancelled'));
+                });
+            } finally { db.close(); }
         }
 
         async function appendDayToIndexedDB(dateStr, fileName, records) {
@@ -2027,22 +2066,24 @@
                         return;
                     }
 
-                    // Commit locally first; only after every date is saved do we send
-                    // records to Google. Local history remains available offline.
+                    // Save only rows in this CSV. Append merges by date + office ID;
+                    // Replace overwrites the full local date(s) represented by the CSV.
+                    const uploadMode = (document.getElementById('csv-upload-mode') || {}).value || 'append';
                     for (const d of dates) {
-                        await appendDayToIndexedDB(d, file.name, groupedByDate[d]);
+                        if (uploadMode === 'replace') await replaceDayInIndexedDB(d, file.name, groupedByDate[d]);
+                        else await appendDayToIndexedDB(d, file.name, groupedByDate[d]);
                     }
                     await loadFromLocalDatabase();
 
-                    const sentResult = await syncRecordsToSheet(newRecordsToUpload, { silent: true });
+                    // Only this CSV is uploaded, never all 31k local rows.
+                    const sentResult = uploadMode === 'replace'
+                        ? await sendReplaceDatesToSheet(dates, newRecordsToUpload)
+                        : await syncRecordsToSheet(newRecordsToUpload, { silent: true });
                     if (sentResult.ok) {
-                        statusEl.innerHTML = `<span style="color:var(--success);font-weight:bold;">CSV saved locally: ${newRecordsToUpload.length} records across ${dates.length} date(s). Google upload request sent; verifying and reconciling…</span>`;
+                        statusEl.innerHTML = `<span style="color:var(--success);font-weight:bold;">CSV ${uploadMode === 'replace' ? 'replaced' : 'appended/merged'}: ${newRecordsToUpload.length} rows across ${dates.length} date(s) saved locally and submitted to Google Sheets.</span>`;
                     } else {
-                        statusEl.innerHTML = `<span style="color:var(--danger);font-weight:bold;">CSV saved locally: ${newRecordsToUpload.length} records. Google unavailable; records will remain local and be retried on the next sync.</span>`;
+                        statusEl.innerHTML = `<span style="color:var(--danger);font-weight:bold;">CSV saved locally (${newRecordsToUpload.length} rows). Google upload failed; retry Sync after checking the connection.</span>`;
                     }
-                    // Reads Google back and automatically uploads all rows missing there,
-                    // including local records from earlier offline sessions.
-                    await syncRecordsFromGoogleSheet({ reason: 'csv-upload' });
 
                 } catch (err) {
                     alert("Error processing CSV: " + err.message);
